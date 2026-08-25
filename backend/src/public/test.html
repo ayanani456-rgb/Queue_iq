@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>QueueIQ — MVP Demo</title>
+<style>
+  :root { --bg:#0b1220; --panel:#111827; --card:#1F2937; --card2:#161f2e; --line:#374151;
+          --muted:#9CA3AF; --green:#10B981; --amber:#F59E0B; --red:#EF4444; --blue:#3B82F6; --ink:#F9FAFB; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  .wrap { max-width:1120px; margin:0 auto; padding:18px 18px 60px; }
+  header.top { display:flex; justify-content:space-between; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:16px; }
+  .brand { display:flex; align-items:center; gap:10px; }
+  .logo { width:34px; height:34px; border-radius:9px; background:linear-gradient(135deg,var(--green),#0891b2); display:flex; align-items:center; justify-content:center; font-size:18px; }
+  h1 { font-size:20px; margin:0; }
+  .sub { color:var(--muted); font-size:12.5px; margin-top:1px; }
+  .rightctl { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .who { font-size:12.5px; color:var(--muted); text-align:right; }
+  .who b { color:var(--ink); }
+  .apibox input { background:var(--panel); border:1px solid var(--line); color:var(--ink); border-radius:8px; padding:7px 9px; font-size:12px; width:180px; }
+  .apibox label { display:block; font-size:10px; color:var(--muted); margin:0 0 3px; }
+  .serverpill { font-size:11px; color:var(--muted); margin-top:4px; }
+  .dot { width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:6px; vertical-align:middle; }
+  button { cursor:pointer; border:none; border-radius:9px; padding:9px 12px; font-size:13px; font-weight:700; color:#08111e; background:var(--green); transition:.15s; }
+  button:hover { filter:brightness(1.08); }
+  button.ghost { background:transparent; color:var(--ink); border:1px solid var(--line); }
+  button.ghost:hover { border-color:var(--green); }
+  button.red { background:var(--red); color:#fff; }
+  button.mini { padding:6px 10px; font-size:12px; }
+
+  #login { max-width:420px; margin:24px auto; }
+  .lcard { background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:22px; }
+  .ltabs { display:flex; background:var(--bg); border:1px solid var(--line); border-radius:10px; overflow:hidden; margin-bottom:16px; }
+  .ltabs button { flex:1; background:transparent; color:var(--muted); border-radius:0; }
+  .ltabs button.on { background:var(--green); color:#08111e; }
+  label.fld { display:block; font-size:12px; color:var(--muted); margin:12px 0 5px; }
+  input.fld { width:100%; background:var(--bg); border:1px solid var(--line); color:var(--ink); border-radius:9px; padding:10px 11px; font-size:14px; }
+  input.fld:focus { outline:none; border-color:var(--green); }
+  .demo { margin-top:14px; border-top:1px solid var(--line); padding-top:12px; }
+  .demo .dh { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:8px; }
+  .cred { display:flex; justify-content:space-between; align-items:center; gap:8px; background:var(--card); border:1px solid var(--line); border-radius:9px; padding:8px 10px; margin-bottom:7px; cursor:pointer; font-size:12.5px; }
+  .cred:hover { border-color:var(--green); }
+  .cred .r { font-size:10.5px; color:var(--muted); text-transform:uppercase; }
+  .loginbtn { width:100%; margin-top:14px; padding:12px; font-size:14px; }
+  .lerr { color:var(--red); font-size:12.5px; margin-top:8px; min-height:16px; }
+
+  #patient { display:flex; justify-content:center; }
+  .phone { width:100%; max-width:430px; background:var(--panel); border:1px solid var(--line); border-radius:20px; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,.4); }
+  .screen { padding:16px; min-height:540px; }
+  .crumb { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--muted); margin-bottom:12px; min-height:20px; }
+  .back { background:transparent; border:1px solid var(--line); color:var(--ink); border-radius:8px; padding:4px 9px; font-size:12px; cursor:pointer; }
+  .stitle { font-size:18px; font-weight:800; margin:2px 0; }
+  .sdesc { font-size:12.5px; color:var(--muted); margin-bottom:14px; }
+  .search { width:100%; background:var(--bg); border:1px solid var(--line); color:var(--ink); border-radius:10px; padding:10px 12px; font-size:14px; margin-bottom:12px; }
+  .orgcard,.rowcard { width:100%; text-align:left; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px 13px; cursor:pointer; transition:.15s; margin-bottom:10px; display:block; }
+  .orgcard:hover,.rowcard:hover { border-color:var(--green); transform:translateY(-1px); }
+  .on1 { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .oname { font-weight:800; font-size:15px; }
+  .ometa { font-size:12px; color:var(--muted); margin-top:5px; }
+  .badge { font-size:10.5px; font-weight:800; padding:2px 8px; border-radius:999px; text-transform:uppercase; }
+  .b-clinic{background:rgba(16,185,129,.15);color:var(--green)} .b-bank{background:rgba(59,130,246,.15);color:var(--blue)}
+  .b-salon{background:rgba(245,158,11,.15);color:var(--amber)} .b-lab{background:rgba(139,92,246,.18);color:#a78bfa}
+  .b-government{background:rgba(148,163,184,.18);color:#cbd5e1}
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .dept { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px; cursor:pointer; text-align:left; }
+  .dept:hover{border-color:var(--green)} .dept .di{font-size:22px} .dept .dn{font-weight:700;font-size:13px;margin-top:5px} .dept .dc{font-size:11px;color:var(--muted);margin-top:2px}
+  .fee { font-weight:800; color:var(--green); }
+  .docmeta { font-size:11.5px; color:var(--muted); margin-top:6px; line-height:1.6; }
+  .types { display:flex; flex-direction:column; gap:9px; margin:8px 0 4px; }
+  .type { text-align:left; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; gap:10px; }
+  .type.sel{border-color:var(--green);box-shadow:0 0 0 1px var(--green) inset} .type.emg.sel{border-color:var(--red);box-shadow:0 0 0 1px var(--red) inset}
+  .type .tn{font-weight:800;font-size:14px} .type .td{font-size:11px;color:var(--muted);margin-top:2px}
+  .type .tp{font-weight:800;font-size:15px;white-space:nowrap} .type .tp small{color:var(--muted);font-weight:600;font-size:10px;display:block;text-align:right}
+  #emgWrap{display:none;margin-top:10px;padding:11px;border:1px solid var(--red);border-radius:11px;background:rgba(239,68,68,.06)} #emgWrap.show{display:block}
+  .cap{font-size:11.5px;color:var(--red);font-weight:700;margin-bottom:3px}
+  textarea.fld,select.fld{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:9px;padding:10px 11px;font-size:14px;font-family:inherit}
+  .cta { width:100%; margin-top:16px; padding:13px; font-size:15px; font-weight:800; border-radius:11px; background:var(--green); color:#08111e; }
+  .cta.red{background:var(--red);color:#fff}
+  .cta.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
+  .ticket { background:linear-gradient(160deg,var(--card),var(--card2)); border:1px solid var(--line); border-radius:16px; padding:18px; text-align:center; }
+  .ticket .lab{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)} .ticket .num{font-size:44px;font-weight:900;margin:4px 0} .ticket .meta{font-size:13px;line-height:1.9;margin-top:8px} .ticket .live{font-size:11px;color:var(--muted);margin-top:8px}
+  .pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:800}
+  .t-normal{background:rgba(59,130,246,.15);color:var(--blue)} .t-express{background:rgba(16,185,129,.15);color:var(--green)} .t-emergency{background:rgba(239,68,68,.15);color:var(--red)}
+  .s-Serving{color:var(--green);font-weight:800}.s-Waiting{color:var(--amber)}.s-Done{color:var(--muted)}.s-Skipped{color:var(--red)}.s-PendingApproval{color:var(--amber);font-weight:800}.s-Rejected{color:var(--red)}
+  .tier-fast_track{color:var(--red);font-weight:800}.tier-needs_review{color:var(--amber);font-weight:800}.tier-insufficient_info{color:var(--muted);font-weight:800}
+
+  #business{display:none}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px} .card+.card{margin-top:16px}
+  .card h2{font-size:12px;margin:0;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)} .card .lead{font-size:15px;font-weight:800;margin:0 0 12px}
+  .barrow{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+  .docpick{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+  .docpick button{background:var(--card);color:var(--ink);border:1px solid var(--line);font-weight:600}
+  .docpick button.on{background:var(--green);color:#08111e;border-color:var(--green)}
+  .docpick .qn{font-size:10px;opacity:.8;margin-left:4px}
+  table{width:100%;border-collapse:collapse;font-size:13px} th,td{text-align:left;padding:8px;border-bottom:1px solid var(--line)} th{color:var(--muted);font-weight:700;font-size:10.5px;text-transform:uppercase}
+  .summary{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin-bottom:10px} .summary b{color:var(--ink)}
+  .totalbig{font-size:26px;font-weight:900} .totalbig small{font-size:12px;color:var(--muted);font-weight:600}
+  .pendrow{border:1px solid var(--line);border-radius:11px;padding:11px 13px;margin-bottom:8px;font-size:13px;background:var(--card)} .pendrow .acts{margin-top:9px;display:flex;gap:8px}
+  .muted{color:var(--muted)}
+  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--green);color:#08111e;padding:11px 18px;border-radius:9px;font-weight:700;font-size:13px;opacity:0;transition:.2s;pointer-events:none;z-index:9} .toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="logo">🎫</div>
+      <div><h1>QueueIQ</h1><div class="sub">MVP demo — per-doctor queues · login &amp; catalog from Supabase</div></div>
+    </div>
+    <div class="rightctl">
+      <div class="who" id="who"></div>
+      <div class="apibox"><label>Backend</label><input id="apiBase" value="http://localhost:5000" /><div class="serverpill" id="serverState"><span class="dot" style="background:var(--muted)"></span>—</div></div>
+      <button class="ghost" id="logoutBtn" style="display:none" onclick="logout()">Log out</button>
+    </div>
+  </header>
+
+  <!-- LOGIN -->
+  <div id="login">
+    <div class="lcard">
+      <div class="ltabs"><button id="tabPatient" class="on" onclick="setTab('patient')">I'm a patient</button><button id="tabBiz" onclick="setTab('business')">Hospital staff</button></div>
+      <label class="fld">Email</label><input class="fld" id="email" placeholder="you@example.com"/>
+      <label class="fld">Password</label><input class="fld" id="pw" type="password" placeholder="••••••"/>
+      <button class="loginbtn" onclick="doLogin()">Log in</button>
+      <div class="lerr" id="lerr"></div>
+      <div class="demo"><div class="dh">Demo accounts — tap to fill</div><div id="creds"></div></div>
+    </div>
+  </div>
+
+  <!-- PATIENT -->
+  <div id="patient"><div class="phone"><div class="screen" id="app"></div></div></div>
+
+  <!-- BUSINESS -->
+  <div id="business">
+    <div class="card">
+      <div class="barrow">
+        <div><h2 id="bizRole">Staff</h2><div class="lead" id="bizLead" style="margin:0">Queue</div></div>
+        <div style="display:flex;gap:8px" id="bizActions"></div>
+      </div>
+      <div id="docpickWrap"></div>
+      <div class="summary" id="summary"></div>
+      <div style="overflow-x:auto"><table><thead><tr><th>Pos</th><th>Token</th><th>Type</th><th>Status</th><th>Phone</th><th id="thAct"></th></tr></thead><tbody id="queueBody"><tr><td colspan="6" class="muted">Loading…</td></tr></tbody></table></div>
+      <div class="muted" style="font-size:11.5px;margin-top:8px">Auto-refreshing every 2 seconds.</div>
+    </div>
+    <div class="card" id="pendCard">
+      <h2>🚨 Emergency approvals — this doctor's line</h2>
+      <div class="muted" style="font-size:12px;margin:4px 0 12px;line-height:1.6">The AI advises; you approve or reject. Approved emergencies jump this doctor's line only.</div>
+      <div id="pendingBody"><span class="muted">None awaiting approval.</span></div>
+    </div>
+  </div>
+</div>
+<div id="toast" class="toast"></div>
+
+<script>
+const SB_URL='https://nwrfpdwacfxttxfjwzxx.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im53cmZwZHdhY2Z4dHR4Zmp3enh4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2OTg0NjAsImV4cCI6MjEwMTI3NDQ2MH0.FepL_FzmQRWtqECbS8hgAimaUZ8BG6NkeeotbRTjW-g';
+const SB_H = { apikey:SB_KEY, Authorization:'Bearer '+SB_KEY, 'Content-Type':'application/json' };
+async function sbGet(q){ const r=await fetch(SB_URL+'/rest/v1/'+q,{headers:SB_H}); if(!r.ok) throw new Error('db '+r.status); return r.json(); }
+async function sbLogin(email,pw){ const r=await fetch(SB_URL+'/rest/v1/rpc/login',{method:'POST',headers:SB_H,body:JSON.stringify({p_email:email,p_password:pw})}); if(!r.ok) throw new Error('login '+r.status); return r.json(); }
+
+const $ = id => document.getElementById(id);
+const api = () => $('apiBase').value.replace(/\/$/,'');
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1900); }
+function randomPhone(){ let n='03'; for(let i=0;i<9;i++) n+=Math.floor(Math.random()*10); return n; }
+function priceFor(fee){ return { normal:fee, express:fee*2, emergency:fee }; }
+
+// ---------- session / login ----------
+let SESSION = null;
+const CREDS = {
+  patient:[{e:'patient@demo.com',p:'123456',r:'Patient'}],
+  business:[{e:'reception.cardio@alshifa.com',p:'123456',r:'Cardiology Reception'},{e:'dr.ayesha@alshifa.com',p:'123456',r:'Doctor'},{e:'dr.rabia@alshifa.com',p:'123456',r:'Doctor'},{e:'dr.salman@alshifa.com',p:'123456',r:'Doctor'}],
+};
+let TAB='patient';
+function setTab(t){ TAB=t; $('tabPatient').classList.toggle('on',t==='patient'); $('tabBiz').classList.toggle('on',t==='business'); renderCreds(); }
+function renderCreds(){ $('creds').innerHTML = CREDS[TAB].map(c=>`<div class="cred" onclick="fill('${c.e}','${c.p}')"><span><b>${c.e}</b></span><span class="r">${c.r}</span></div>`).join(''); }
+function fill(e,p){ $('email').value=e; $('pw').value=p; }
+
+async function doLogin(){
+  $('lerr').textContent='';
+  const email=$('email').value.trim(), pw=$('pw').value;
+  if(!email||!pw){ $('lerr').textContent='Enter email and password.'; return; }
+  try{
+    const rows = await sbLogin(email,pw);
+    if(!rows.length){ $('lerr').textContent='Wrong email or password.'; return; }
+    SESSION = rows[0]; afterLogin();
+  }catch(e){ $('lerr').textContent='Could not reach the database.'; }
+}
+function logout(){ SESSION=null; if(S.trackTimer) clearInterval(S.trackTimer); if(S.mineTimer){clearInterval(S.mineTimer);S.mineTimer=null;} BIZ={doctors:[],doctorId:null}; showGate(); }
+function showGate(){
+  const on=!!SESSION;
+  $('login').style.display=on?'none':'block'; $('logoutBtn').style.display=on?'inline-block':'none';
+  $('patient').style.display='none'; $('business').style.display='none';
+  if(!on){ $('who').textContent=''; return; }
+  $('who').innerHTML=`<b>${SESSION.display_name||SESSION.email}</b><br>${SESSION.role}${SESSION.org_slug?(' · '+SESSION.org_slug):''}`;
+}
+async function afterLogin(){
+  showGate();
+  if(SESSION.role==='patient'){ $('patient').style.display='flex'; S.screen='home'; S.orgs=null; render(); }
+  else { $('business').style.display='block'; await initBiz(); }
+}
+
+// ---------- PATIENT ----------
+const S = { screen:'home', q:'', orgs:null, org:null, depts:[], docs:[], dept:null, doctor:null, service:null, tokenType:'normal', price:0, trackTimer:null, mineTimer:null, lastResp:null };
+const CATEGORY_MAP = {
+  bank:[{icon:'💰',label:'Account Opening'},{icon:'📋',label:'Loan Inquiry'},{icon:'💳',label:'Card Services'},{icon:'🏦',label:'Cash Deposit/Withdrawal'}],
+  salon:[{icon:'✂️',label:'Haircut'},{icon:'💆',label:'Massage'},{icon:'💅',label:'Manicure/Pedicure'}],
+  lab:[{icon:'🧪',label:'Blood Test'},{icon:'🩻',label:'X-Ray'},{icon:'🫀',label:'ECG'},{icon:'🧬',label:'Full Body Checkup'}],
+  government:[{icon:'🆔',label:'ID Card'},{icon:'📄',label:'Document Renewal'},{icon:'📝',label:'New Registration'},{icon:'🛂',label:'Passport'}],
+};
+function go(scr){ if(S.trackTimer && scr!=='token'){ clearInterval(S.trackTimer); S.trackTimer=null; } if(S.mineTimer && scr!=='mytokens'){ clearInterval(S.mineTimer); S.mineTimer=null; } S.screen=scr; render(); }
+async function loadOrgs(){ try{ S.orgs=await sbGet('organizations?select=*&order=name'); }catch(e){ S.orgs=[]; toast('DB read failed'); } render(); }
+async function openOrg(i){
+  S.org=S.orgs[i];
+  if(S.org.type==='clinic'){ try{ S.depts=await sbGet('departments?select=*&organization_id=eq.'+S.org.id+'&order=name'); S.docs=await sbGet('doctors?select=*&organization_id=eq.'+S.org.id);}catch(e){S.depts=[];S.docs=[];} go('clinic'); }
+  else go('services');
+}
+function deptCount(depId){ return S.docs.filter(d=>d.department_id===depId).length; }
+function openDept(depId){ S.dept=depId; go('doctors'); }
+function openDoctor(i){ const list=S.docs.filter(d=>d.department_id===S.dept); S.doctor=list[i]; S.service=null; S.tokenType='normal'; go('book'); }
+function openService(label){ S.service=label; S.doctor=null; S.tokenType='normal'; go('book'); }
+function selectType(t){ S.tokenType=t; render(); }
+function crumb(){ const p=[]; if(S.org)p.push(S.org.name); if(S.screen==='doctors'&&S.dept){const d=S.depts.find(x=>x.id===S.dept);if(d)p.push(d.name);} if(S.screen==='book')p.push(S.doctor?S.doctor.name:S.service); return p.join('  ›  '); }
+
+function render(){
+  const app=$('app'); const back=S.screen==='home'?'':`<button class="back" onclick="goBack()">‹ Back</button>`; let body='';
+  if(S.screen==='home'){
+    if(S.orgs===null){ app.innerHTML='<div class="sdesc">Loading places from the database…</div>'; loadOrgs(); return; }
+    const q=S.q.toLowerCase(); const list=S.orgs.filter(o=>o.name.toLowerCase().includes(q));
+    body=`<div class="stitle">Find a place</div><div class="sdesc">Live from Supabase. Tap one to book your turn.</div>
+      <input class="search" placeholder="Search…" value="${S.q}" oninput="S.q=this.value; render(); this.focus();"/>
+      ${list.map(o=>{const idx=S.orgs.indexOf(o); return `<button class="orgcard" onclick="openOrg(${idx})"><div class="on1"><span class="oname">${o.name}</span><span class="badge b-${o.type}">${o.type}</span></div><div class="ometa">${o.address||''} · Open ${o.open_time||'—'}–${o.close_time||'—'}</div></button>`;}).join('')}
+      <button class="cta ghost" style="margin-top:6px" onclick="go('mytokens')">📋 My tokens &amp; live status</button>
+      <button class="cta ghost" style="margin-top:8px" onclick="trackPrompt()">🔎 Look up any token</button>`;
+  }
+  else if(S.screen==='clinic'){
+    body=`<div class="stitle">${S.org.name}</div><div class="sdesc">${S.org.address||''} · ${S.org.open_time}–${S.org.close_time}</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Departments</div>
+      <div class="grid2">${S.depts.map(d=>`<button class="dept" onclick="openDept('${d.id}')"><div class="di">${d.icon||'🏥'}</div><div class="dn">${d.name}</div><div class="dc">${deptCount(d.id)} doctors</div></button>`).join('')}</div>`;
+  }
+  else if(S.screen==='doctors'){
+    const list=S.docs.filter(d=>d.department_id===S.dept); const dn=S.depts.find(x=>x.id===S.dept);
+    body=`<div class="stitle">${dn?dn.name:''}s</div><div class="sdesc">Each doctor has their own line — you'll only wait behind their patients.</div>
+      ${list.length?list.map((d,i)=>`<button class="rowcard" onclick="openDoctor(${i})"><div class="on1"><span class="oname">${d.name}</span><span class="fee">Rs ${d.fee}</span></div><div class="docmeta">${d.specialty} · ${d.experience||0} yrs · ${(d.schedule&&d.schedule.when)||''}<br>${d.bio||''}</div></button>`).join(''):'<div class="muted">No doctors listed.</div>'}`;
+  }
+  else if(S.screen==='services'){
+    const svc=CATEGORY_MAP[S.org.type]||[];
+    body=`<div class="stitle">${S.org.name}</div><div class="sdesc">Choose a service.</div>${svc.map(s=>`<button class="rowcard" onclick="openService('${s.label}')"><span style="font-size:18px">${s.icon}</span> &nbsp;<b>${s.label}</b></button>`).join('')}`;
+  }
+  else if(S.screen==='book'){
+    const isC=!!S.doctor; const who=isC?S.doctor.name:S.service; const sub=isC?`${S.doctor.specialty} · ${S.org.name}`:S.org.name; let tb='';
+    if(isC){ const p=priceFor(S.doctor.fee); S.price=p[S.tokenType];
+      const T=[['normal','Normal','Regular order · planned visit',p.normal,''],['express','Express','Priority (3:1 rule)',p.express,'2× normal'],['emergency','Emergency','Separate lane · needs approval',p.emergency,'same as normal']];
+      tb=`<div style="font-size:12px;color:var(--muted);margin-top:6px">Token type</div><div class="types">
+        ${T.map(([k,n,d,pr,note])=>`<div class="type ${k==='emergency'?'emg':''} ${S.tokenType===k?'sel':''}" onclick="selectType('${k}')"><div><div class="tn">${n}</div><div class="td">${d}</div></div><div class="tp">Rs ${pr}${note?`<small>${note}</small>`:''}</div></div>`).join('')}</div>
+        <div id="emgWrap" class="${S.tokenType==='emergency'?'show':''}"><div class="cap">Emergency details</div>
+          <select class="fld" id="emgType"><option value="">Select type…</option><option>Chest Pain / Dil ka dard</option><option>Accident / Chot</option><option>Breathing Issue / Saans</option><option>Uncontrolled Bleeding / Khoon</option><option>High Fever / Bukhar</option><option>Severe Pain</option><option>Other</option></select>
+          <textarea class="fld" id="emgDesc" rows="2" style="margin-top:8px" placeholder="Describe the emergency…"></textarea></div>`;
+    } else { S.price=0; }
+    body=`<div class="stitle">${who}</div><div class="sdesc">${sub}</div>${tb}
+      <label class="fld">WhatsApp number</label><input class="fld" id="phone" placeholder="03XXXXXXXXX"/>
+      <button class="cta ${S.tokenType==='emergency'&&isC?'red':''}" onclick="book()">${isC?(S.tokenType==='emergency'?'Submit emergency for approval':('Book '+S.tokenType+' · Rs '+S.price)):'Book token'}</button>`;
+  }
+  else if(S.screen==='token'){
+    const d=S.lastResp;
+    if(d.status==='PendingApproval'){ const t=d.triage||{};
+      body=`<div class="ticket"><div class="lab">Emergency submitted</div><div class="num">${d.token}</div><span class="pill t-emergency">emergency</span> <span class="s-PendingApproval">awaiting approval</span>
+        <div class="meta">AI urgency <b>${t.urgencyScore!=null?Math.round(t.urgencyScore*100)+'%':'—'}</b> · <span class="tier-${t.recommendation}">${t.recommendation||'—'}</span></div></div>
+        <button class="cta ghost" style="margin-top:12px" onclick="viewStatus('${d.token}')">🔄 View token status</button>
+        <button class="cta ghost" style="margin-top:8px" onclick="go('home')">Book another</button>`;
+    } else {
+      body=`<div class="ticket"><div class="lab">Your token</div><div class="num">${d.token}</div><span class="pill t-${d.tokenType}">${d.tokenType}</span> ${S.price?`· <b>Rs ${S.price}</b>`:''}
+        <div class="meta" id="tkMeta"></div><div class="live" id="tkLive">live · updates as the queue moves</div></div>
+        <button class="cta ghost" style="margin-top:12px" onclick="viewStatus('${d.token}')">🔄 View token status</button>
+        <button class="cta ghost" style="margin-top:8px" onclick="go('home')">Book another</button>`;
+    }
+  }
+  else if(S.screen==='mytokens'){
+    body=`<div class="stitle">My tokens</div><div class="sdesc">Live status of everything you've booked${SESSION&&SESSION.display_name?(', '+SESSION.display_name):''} — refreshes automatically.</div><div id="mineBody"><div class="muted">Loading…</div></div>`;
+  }
+  app.innerHTML=`<div class="crumb">${back}<span>${crumb()}</span></div>${body}`;
+  if(S.screen==='token'&&S.lastResp&&S.lastResp.status!=='PendingApproval'){ paintLive(S.lastResp); startTracking(S.lastResp.token); }
+  if(S.screen==='mytokens'){ loadMine(); if(!S.mineTimer) S.mineTimer=setInterval(loadMine,3000); }
+}
+function goBack(){ if(S.screen==='clinic'||S.screen==='services')go('home'); else if(S.screen==='doctors')go('clinic'); else if(S.screen==='book')go(S.doctor?'doctors':'services'); else go('home'); }
+
+// ---------- booking + status (Node backend → Supabase query) ----------
+async function book(){
+  let phone=($('phone')?$('phone').value.trim():'')||randomPhone();
+  const isC=!!S.doctor; const doctor=isC?S.doctor.name:(S.service+' — '+S.org.name);
+  const doctorId=isC?S.doctor.id:null;
+  const clientId=(SESSION&&SESSION.account_id)||null;
+  const tokenType=isC?S.tokenType:'normal';
+  const emergencyType=$('emgType')?$('emgType').value:''; const description=$('emgDesc')?$('emgDesc').value:'';
+  try{ const res=await fetch(api()+'/api/tokens/book',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,doctor,doctorId,clientId,tokenType,emergencyType,description})});
+    const d=await res.json(); if(!res.ok){ toast('Error: '+(d.error||res.status)); return; }
+    S.lastResp=d; go('token'); toast('Booked '+d.token);
+  }catch(e){ toast('Cannot reach backend'); }
+}
+function paintLive(d){ const m=$('tkMeta'); if(!m)return; m.innerHTML=`<span class="s-${d.status}">${d.status}</span> · Position <b>${d.position}</b> · <b>${d.peopleAhead}</b> ahead · ~<b>${d.etaMinutes} min</b> <span class="muted">(${d.etaMin}–${d.etaMax} min)</span><br><span class="muted">now serving ${d.nowServing||'—'} · via ${d.estimateSource||'—'}</span>`; }
+async function viewStatus(token){
+  try{ const r=await fetch(api()+'/api/tokens/status/'+encodeURIComponent(token)); const d=await r.json();
+    if(!r.ok){ toast(d.error||'Not found'); return; }
+    if($('tkMeta')) paintLive(d);
+    toast(`${d.token}: ${d.status} · pos ${d.position} · ~${d.etaMinutes} min`);
+  }catch(e){ toast('Cannot reach backend'); }
+}
+function trackPrompt(){ const t=prompt('Enter your token number (e.g. T-101):'); if(t) viewStatus(t.trim()); }
+async function loadMine(){
+  const el=$('mineBody'); if(!el) return;
+  const cid=SESSION&&SESSION.account_id;
+  if(!cid){ el.innerHTML='<div class="muted">Log in as a patient to see your tokens.</div>'; return; }
+  try{
+    const r=await fetch(api()+'/api/tokens/mine?clientId='+encodeURIComponent(cid)); const d=await r.json();
+    const list=d.tokens||[];
+    el.innerHTML = list.length ? list.map(t=>`
+      <div class="rowcard" style="cursor:default">
+        <div class="on1"><span class="oname">${t.token}</span><span class="pill t-${t.tokenType}">${t.tokenType}</span></div>
+        <div class="docmeta">${t.doctor||''} · <span class="s-${t.status}">${t.status}</span></div>
+        <div class="docmeta">Position <b>${t.position??'—'}</b> · ${t.peopleAhead??0} ahead · ~<b>${t.etaMinutes||0} min</b> · now serving ${t.nowServing||'—'}</div>
+      </div>`).join('') : '<div class="muted">No tokens yet — book one from “Find a place”.</div>';
+  }catch(e){ el.innerHTML='<div class="muted">Cannot reach backend.</div>'; }
+}
+function startTracking(token){ if(S.trackTimer)clearInterval(S.trackTimer); S.trackTimer=setInterval(async()=>{ try{ const r=await fetch(api()+'/api/tokens/status/'+encodeURIComponent(token)); const d=await r.json(); if(r.ok&&$('tkMeta')) paintLive(d);}catch(e){} },3000); }
+
+// ---------- BUSINESS (per-doctor) ----------
+let BIZ = { doctors:[], doctorId:null };
+async function initBiz(){
+  if(SESSION.role==='doctor'){
+    BIZ.doctorId = SESSION.doctor_id;
+    $('bizRole').textContent='Doctor';
+    $('bizLead').textContent=(SESSION.doctor_name||'My')+' — my line';
+    $('bizActions').innerHTML='';           // doctor is read-only
+    $('docpickWrap').innerHTML='';
+    $('pendCard').style.display='none';
+    $('thAct').textContent='';
+  } else { // receptionist
+    $('bizRole').textContent='Reception';
+    $('bizLead').textContent='Pick a doctor to manage their line';
+    $('pendCard').style.display='block';
+    $('thAct').textContent='';
+    try{ BIZ.doctors = await sbGet('doctors?select=id,name&department_id=eq.'+SESSION.department_id+'&order=name'); }catch(e){ BIZ.doctors=[]; }
+    BIZ.doctorId = BIZ.doctors[0] ? BIZ.doctors[0].id : null;
+    renderDocPick();
+  }
+  loadQueue();
+}
+function renderDocPick(){
+  $('docpickWrap').innerHTML = '<div class="docpick">'+BIZ.doctors.map(d=>`<button class="${d.id===BIZ.doctorId?'on':''}" data-id="${d.id}" onclick="pickDoctor('${d.id}')">${d.name}<span class="qn" id="qn-${d.id}"></span></button>`).join('')+'</div>';
+}
+function pickDoctor(id){ BIZ.doctorId=id; document.querySelectorAll('.docpick button').forEach(b=>b.classList.toggle('on',b.dataset.id===id)); loadQueue(); }
+
+async function callNext(){ try{ const r=await fetch(api()+'/api/business/call-next',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({doctorId:BIZ.doctorId})}); const d=await r.json(); toast(d.message||'Called next'); loadQueue(); }catch(e){ toast('Cannot reach backend'); } }
+async function complete(token){ try{ const r=await fetch(api()+'/api/business/complete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token})}); const d=await r.json(); toast(d.message||'Completed'); loadQueue(); }catch(e){ toast('Cannot reach backend'); } }
+async function approveEmg(token,decision){ try{ const r=await fetch(api()+'/api/business/approve-emergency',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,decision})}); const d=await r.json(); if(!r.ok){toast('Error: '+(d.error||r.status));return;} toast(d.message||decision); if(d.note) setTimeout(()=>toast(d.note),950); loadQueue(); }catch(e){ toast('Cannot reach backend'); } }
+
+async function loadQueue(){
+  if(!SESSION || SESSION.role==='patient' || !BIZ.doctorId){ $('serverState').innerHTML='<span class="dot" style="background:var(--muted)"></span>—'; return; }
+  const isRec = SESSION.role==='receptionist';
+  try{
+    const res=await fetch(api()+'/api/business/tokens?doctorId='+encodeURIComponent(BIZ.doctorId)); const d=await res.json();
+    $('serverState').innerHTML='<span class="dot" style="background:var(--green)"></span>backend connected';
+    const s=d.summary||{}; const all=d.tokens||[];
+    // action buttons row (reception only)
+    $('bizActions').innerHTML = isRec ? `<button class="mini" onclick="callNext()">📢 Call next</button><button class="mini ghost" onclick="loadQueue()">↻</button>` : `<button class="mini ghost" onclick="loadQueue()">↻</button>`;
+    $('thAct').textContent = isRec ? 'Action' : '';
+    if(SESSION.role==='doctor'){
+      $('summary').innerHTML=`<span class="totalbig">${s.total||0} <small>in your line</small></span> &nbsp; <span>Now serving <b>${s.nowServing||'—'}</b></span> <span>Waiting <b>${s.waiting||0}</b></span> <span>Done <b>${s.done||0}</b></span>`;
+    } else {
+      $('summary').innerHTML=`<span>Now serving <b>${s.nowServing||'—'}</b></span><span>Waiting <b>${s.waiting||0}</b></span><span>Done <b>${s.done||0}</b></span><span>Total <b>${s.total||0}</b></span>`;
+      const q=$('qn-'+BIZ.doctorId); if(q) q.textContent='('+(s.waiting||0)+')';
+    }
+    $('queueBody').innerHTML=(all.filter(r=>r.status!=='PendingApproval').map(r=>{ const can=r.status==='Waiting'||r.status==='Serving';
+      return `<tr><td>${r.position??'—'}</td><td><b>${r.token}</b></td><td><span class="pill t-${r.tokenType||'normal'}">${r.tokenType||'normal'}</span></td><td class="s-${r.status}">${r.status}</td><td class="muted">${r.phone||''}</td><td>${(isRec&&can)?`<button class="mini ghost" onclick="complete('${r.token}')">Complete</button>`:''}</td></tr>`;
+    }).join(''))||'<tr><td colspan="6" class="muted">This line is empty.</td></tr>';
+    if(isRec){
+      const pend=all.filter(r=>r.status==='PendingApproval');
+      $('pendingBody').innerHTML=pend.length?pend.map(r=>{ const t=r.triage||{};
+        return `<div class="pendrow"><b>${r.token}</b> · ${r.emergencyType||'—'} · urgency <b>${t.urgencyScore!=null?Math.round(t.urgencyScore*100)+'%':'—'}</b> <span class="tier-${t.recommendation}">(${t.recommendation||'—'})</span><br><span class="muted">"${r.description||''}" · ${r.phone||''}</span><div class="acts"><button class="mini" onclick="approveEmg('${r.token}','approve')">✓ Approve</button><button class="mini red" onclick="approveEmg('${r.token}','reject')">✕ Reject</button></div></div>`;
+      }).join(''):'<span class="muted">None awaiting approval.</span>';
+    }
+  }catch(e){ $('serverState').innerHTML='<span class="dot" style="background:var(--red)"></span>backend not reachable'; }
+}
+
+// boot
+renderCreds(); showGate();
+setInterval(()=>{ if(SESSION && SESSION.role!=='patient') loadQueue(); }, 2000);
+</script>
+</body>
+</html>

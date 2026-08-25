@@ -1,0 +1,23 @@
+# dependencies
+node_modules/
+
+# environment & secrets  (NEVER commit a real .env)
+.env
+.env.*
+!.env.example
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# logs
+*.log
+
+# os
+.DS_Store
+Thumbs.db
+
+# editor scratch
+tempCodeRunnerFile.*
