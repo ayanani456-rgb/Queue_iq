@@ -17,7 +17,13 @@ const app = express();
 // Fine for local dev, but replace it with our real frontend origin
 // (e.g. 'https://queueiq.com'). '*' also cannot be combined with logged-in cookies.
 app.use(cors({
-  origin: '*',
+  origin(origin, callback) {
+    const allowed = !origin
+      || origin === 'https://queueiq-frontend.vercel.app'
+      || origin === 'http://localhost:3000'
+      || /^https:\/\/[^/]+\.vercel\.app$/.test(origin);
+    callback(null, allowed);
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
@@ -36,7 +42,8 @@ const bookingRateLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
 app.use('/api/bookings', bookingRateLimiter, bookingRoutes);
 
 // Health check — open http://localhost:5000/ to confirm the server is alive.
-app.get('/', (req, res) => res.send('QueueIQ backend running'));
+app.get('/', (req, res) => res.json({ status: 'ok' }));
+app.get('/docs', (req, res) => res.json({ status: 'ok', service: 'QueueIQ backend' }));
 
 // Test console — open http://localhost:5000/test in your browser.
 const path = require('path');

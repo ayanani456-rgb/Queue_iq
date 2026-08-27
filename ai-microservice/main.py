@@ -8,14 +8,24 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://queueiq-frontend.vercel.app",
+        "https://*.vercel.app",
+        "http://localhost:3000",
+    ],
+    allow_origin_regex=r"https://.*\.vercel\.app",
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    allow_credentials=True,
 )
 
 app.include_router(ai_router)
 app.include_router(calendar_router)
+
+
+@app.get("/")
+def root():
+    return {"status": "ok"}
 
 
 @app.get("/api/ai/health")
