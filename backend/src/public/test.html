@@ -153,7 +153,7 @@
 
 <script>
 const SB_URL='https://nwrfpdwacfxttxfjwzxx.supabase.co';
-const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im53cmZwZHdhY2Z4dHR4Zmp3enh4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2OTg0NjAsImV4cCI6MjEwMTI3NDQ2MH0.FepL_FzmQRWtqECbS8hgAimaUZ8BG6NkeeotbRTjW-g';
+const SB_KEY='sb_publishable_zjRmE547dWVVd1Q54uIDNQ_QpX5CqIk';
 const SB_H = { apikey:SB_KEY, Authorization:'Bearer '+SB_KEY, 'Content-Type':'application/json' };
 async function sbGet(q){ const r=await fetch(SB_URL+'/rest/v1/'+q,{headers:SB_H}); if(!r.ok) throw new Error('db '+r.status); return r.json(); }
 async function sbLogin(email,pw){ const r=await fetch(SB_URL+'/rest/v1/rpc/login',{method:'POST',headers:SB_H,body:JSON.stringify({p_email:email,p_password:pw})}); if(!r.ok) throw new Error('login '+r.status); return r.json(); }

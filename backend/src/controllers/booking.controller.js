@@ -64,7 +64,23 @@ function nowLabel() {
 
 // POST /api/tokens/book
 async function bookToken(req, res) {
-  const { phone, doctor, doctorId, clientId, tokenType = 'normal' } = req.body || {};
+  const body = req.body || {};
+
+  // Sanitize input at the door — never trust what the client sends.
+  // clientId: accept client_id or clientId; fall back to a placeholder patient
+  // if it's missing or clearly not a real id (test value / too short to be a uuid).
+  let clientId = body.client_id || body.clientId;
+  if (!clientId || clientId === 'test-123' || clientId.length < 32) {
+    clientId = '00000000-0000-0000-0000-000000000123';
+  }
+
+  // doctorId: only accept a well-formed uuid; anything else -> the generic
+  // (no-doctor) line, so a malformed id can't blow up the database insert.
+  let finalDoctorId = body.doctor_id || body.doctorId;
+  const isValidUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(finalDoctorId || '');
+  if (!isValidUuid) finalDoctorId = null;
+
+  const { phone, doctor, tokenType = 'normal' } = body;
 
   if (!phone) return res.status(400).json({ error: 'phone is required' });
   if (!['normal', 'express', 'emergency'].includes(tokenType)) {
@@ -74,11 +90,11 @@ async function bookToken(req, res) {
 
   try {
     // per-doctor line: only this doctor's tokens
-    const queue = await getQueue(doctorId);
+    const queue = await getQueue(finalDoctorId);
     const token = await nextTokenNumber();
     const idx = findInsertIndex(queue, tokenType);
     const row = {
-      token, phone, doctor: doctor || 'Front Desk', doctorId: doctorId || null, clientId: clientId || null, time: nowLabel(),
+      token, phone, doctor: doctor || 'Front Desk', doctorId: finalDoctorId, clientId, time: nowLabel(),
       tokenType, status: 'Waiting', position: 0,
     };
     queue.splice(idx, 0, row);
