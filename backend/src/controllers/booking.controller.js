@@ -95,7 +95,7 @@ async function bookToken(req, res) {
     const idx = findInsertIndex(queue, tokenType);
     const row = {
       token, phone, doctor: doctor || 'Front Desk', doctorId: finalDoctorId, clientId, time: nowLabel(),
-      tokenType, status: 'Waiting', position: 0,
+      tokenType, price: req.body.price, status: 'Waiting', position: 0,
     };
     queue.splice(idx, 0, row);
     renumber(queue);
@@ -137,7 +137,7 @@ async function bookEmergency(req, res) {
     const queue = await getQueue(doctorId);
     const row = {
       token, phone, doctor: doctor || 'Front Desk', doctorId: doctorId || null, clientId: clientId || null, time: nowLabel(),
-      tokenType: 'emergency', status: 'PendingApproval', position: null,
+      tokenType: 'emergency', price: req.body.price, status: 'PendingApproval', position: null,
       emergencyType: emergencyType || '', description: description || '', triage,
     };
     queue.push(row);
@@ -230,4 +230,17 @@ async function getMyTokens(req, res) {
   }
 }
 
-module.exports = { bookToken, getStatus, getMyTokens };
+async function cancelBooking(req, res) {
+  try {
+    const booking = await findToken(req.params.id);
+    if (!booking) return res.status(404).json({ error: 'Booking not found' });
+
+    booking.status = 'cancelled';
+    await setQueue([booking]);
+    return res.json({ message: 'Booking Cancelled' });
+  } catch (e) {
+    return res.status(500).json({ error: String(e.message || e) });
+  }
+}
+
+module.exports = { bookToken, getStatus, getMyTokens, cancelBooking };

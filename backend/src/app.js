@@ -41,9 +41,11 @@ app.get('/test', (req, res) => res.sendFile(path.join(__dirname, 'public', 'test
 
 // --- Start server --------------------------------------------------------------
 const { startAi } = require('./startAi');
+const { connectRedis } = require('./config/redis');
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`QueueIQ backend listening on http://localhost:${PORT}`);
+  connectRedis().catch((error) => console.error('Redis connection failed', error));
   startAi();   // bring the AI microservice up alongside the server
 });
 
