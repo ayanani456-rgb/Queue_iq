@@ -4,6 +4,7 @@
 require('dotenv').config();   // load .env (SUPABASE_URL, SUPABASE_KEY, QUEUEIQ_ORG_ID, …)
 const express = require('express');
 const cors = require('cors');
+const { rateLimit } = require('express-rate-limit');
 const app = express();
 
 // --- CORS ----------------------------------------------------------------------
@@ -31,6 +32,8 @@ app.use('/api/business', businessRoutes);
 
 const bookingRoutes = require('./routes/booking.routes');
 app.use('/api/tokens', bookingRoutes);
+const bookingRateLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
+app.use('/api/bookings', bookingRateLimiter, bookingRoutes);
 
 // Health check — open http://localhost:5000/ to confirm the server is alive.
 app.get('/', (req, res) => res.send('QueueIQ backend running'));

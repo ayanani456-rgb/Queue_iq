@@ -20,6 +20,10 @@ const {
 } = require('../logic/queueLogic');
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
+const configuredQueueSize = Number(process.env.QUEUE_MAX_SIZE || 100);
+const MAX_QUEUE_SIZE = Number.isFinite(configuredQueueSize) && configuredQueueSize > 0
+  ? configuredQueueSize
+  : 100;
 
 // Ask the AI service for a rich wait estimate; fall back to simple local math.
 async function estimateWait({ clinicId, peopleAhead, emergencyAhead, avgServiceMinutes }) {
@@ -91,6 +95,9 @@ async function bookToken(req, res) {
   try {
     // per-doctor line: only this doctor's tokens
     const queue = await getQueue(finalDoctorId);
+    if (queue.filter(isActive).length >= MAX_QUEUE_SIZE) {
+      return res.status(400).json({ error: 'Queue full' });
+    }
     const token = await nextTokenNumber();
     const idx = findInsertIndex(queue, tokenType);
     const row = {
