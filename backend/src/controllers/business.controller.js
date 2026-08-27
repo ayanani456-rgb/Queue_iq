@@ -11,6 +11,7 @@
 
 const { getQueue, setQueue, findToken, recordFalseClaim, isEmergencySuspended, FALSE_CLAIM_LIMIT } = require('../data/store');
 const { renumber, findInsertIndex } = require('../logic/queueLogic');
+const { sendWhatsApp } = require('../services/whatsapp.service.js');
 
 function buildSummary(queue) {
   const nowServing = queue.find((row) => row.status === 'Serving');
@@ -42,6 +43,15 @@ async function callNext(req, res) {
     const current = queue.find((row) => row.status === 'Serving');
     if (current) current.status = 'Done';
 
+    const upcoming = queue
+      .filter((row) => String(row.status).toLowerCase() === 'waiting')
+      .sort((first, second) => {
+        const firstCreated = new Date(first.createdAt || first.created_at || 0).getTime();
+        const secondCreated = new Date(second.createdAt || second.created_at || 0).getTime();
+        return firstCreated - secondCreated;
+      })
+      .slice(0, 3);
+
     const next = queue.find((row) => row.status === 'Waiting');
     if (!next) {
       await setQueue(queue);
@@ -52,6 +62,17 @@ async function callNext(req, res) {
     }
     next.status = 'Serving';
     await setQueue(queue);
+
+    for (const [index, booking] of upcoming.entries()) {
+      try {
+        await sendWhatsApp(
+          booking.user?.phone || booking.phone,
+          `Get ready! Your turn is in ${index + 1} - Token ${booking.tokenNumber || booking.token}`,
+        );
+      } catch (error) {
+        console.error('WhatsApp notification failed', error);
+      }
+    }
 
     res.json({
       message: `Now serving ${next.token}`,

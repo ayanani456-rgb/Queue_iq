@@ -18,6 +18,7 @@ const {
 const {
   isActive, renumber, findInsertIndex, peopleAheadOfIndex, emergencyAheadOfIndex,
 } = require('../logic/queueLogic');
+const { sendWhatsApp } = require('../services/whatsapp.service.js');
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
 const configuredQueueSize = Number(process.env.QUEUE_MAX_SIZE || 100);
@@ -107,6 +108,11 @@ async function bookToken(req, res) {
     queue.splice(idx, 0, row);
     renumber(queue);
     await setQueue(queue);
+    try {
+      await sendWhatsApp(req.body.phone || req.user.phone, `Your token ${row.token} booked successfully! Price: ${row.price}`);
+    } catch (error) {
+      console.error('WhatsApp notification failed', error);
+    }
 
     const peopleAhead = peopleAheadOfIndex(queue, idx);
     const emergencyAhead = emergencyAheadOfIndex(queue, idx);
@@ -150,6 +156,11 @@ async function bookEmergency(req, res) {
     queue.push(row);
     renumber(queue);
     await setQueue(queue);
+    try {
+      await sendWhatsApp(req.body.phone || req.user.phone, `Your token ${row.token} booked successfully! Price: ${row.price}`);
+    } catch (error) {
+      console.error('WhatsApp notification failed', error);
+    }
 
     res.status(201).json({
       message: 'Emergency submitted — awaiting staff approval',
