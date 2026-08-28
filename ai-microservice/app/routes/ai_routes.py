@@ -23,9 +23,15 @@ router = APIRouter(prefix="/api/ai", tags=["AI"])
 
 class PredictWaitRequest(BaseModel):
     clinicId: str
-    peopleAhead: int              # already counted by Node (from stored positions)
+    # OLD shape — what the Node backend already sends. Preferred when present.
+    peopleAhead: Optional[int] = None
     emergencyAhead: int = 0       # how many of those are emergencies (adds uncertainty)
     avgServiceMinutes: float = 7  # THIS business's per-patient pace (from its DB row)
+    # NEW shape — accepted for backward compatibility so callers sending token
+    # numbers don't 422. Used ONLY when peopleAhead is not provided.
+    currentToken: Optional[int] = None
+    yourToken: Optional[int] = None
+    queueHistory: List[int] = Field(default_factory=list)
 
 
 class PredictWaitResponse(BaseModel):
@@ -36,9 +42,19 @@ class PredictWaitResponse(BaseModel):
     confidence: float
 
 
+def resolve_people_ahead(payload: "PredictWaitRequest") -> int:
+    """Accept either shape: prefer the explicit peopleAhead the backend sends;
+    otherwise derive it from currentToken/yourToken; else assume none ahead."""
+    if payload.peopleAhead is not None:
+        return max(0, payload.peopleAhead)
+    if payload.currentToken is not None and payload.yourToken is not None:
+        return max(0, payload.yourToken - payload.currentToken)
+    return 0
+
+
 @router.post("/predict-wait", response_model=PredictWaitResponse)
 def predict_wait(payload: PredictWaitRequest) -> PredictWaitResponse:
-    people = max(0, payload.peopleAhead)   # never negative
+    people = resolve_people_ahead(payload)   # never negative, both shapes
 
     eta = round(people * payload.avgServiceMinutes)
 
