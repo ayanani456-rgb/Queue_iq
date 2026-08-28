@@ -18,8 +18,13 @@ const {
 const {
   isActive, renumber, findInsertIndex, peopleAheadOfIndex, emergencyAheadOfIndex,
 } = require('../logic/queueLogic');
+const { sendWhatsApp } = require('../services/whatsapp.service.js');
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
+const configuredQueueSize = Number(process.env.QUEUE_MAX_SIZE || 100);
+const MAX_QUEUE_SIZE = Number.isFinite(configuredQueueSize) && configuredQueueSize > 0
+  ? configuredQueueSize
+  : 100;
 
 // Ask the AI service for a rich wait estimate; fall back to simple local math.
 async function estimateWait({ clinicId, peopleAhead, emergencyAhead, avgServiceMinutes }) {
@@ -91,15 +96,23 @@ async function bookToken(req, res) {
   try {
     // per-doctor line: only this doctor's tokens
     const queue = await getQueue(finalDoctorId);
+    if (queue.filter(isActive).length >= MAX_QUEUE_SIZE) {
+      return res.status(400).json({ error: 'Queue full' });
+    }
     const token = await nextTokenNumber();
     const idx = findInsertIndex(queue, tokenType);
     const row = {
       token, phone, doctor: doctor || 'Front Desk', doctorId: finalDoctorId, clientId, time: nowLabel(),
-      tokenType, status: 'Waiting', position: 0,
+      tokenType, price: req.body.price, status: 'Waiting', position: 0,
     };
     queue.splice(idx, 0, row);
     renumber(queue);
     await setQueue(queue);
+    try {
+      await sendWhatsApp(req.body.phone || req.user.phone, `Your token ${row.token} booked successfully! Price: ${row.price}`);
+    } catch (error) {
+      console.error('WhatsApp notification failed', error);
+    }
 
     const peopleAhead = peopleAheadOfIndex(queue, idx);
     const emergencyAhead = emergencyAheadOfIndex(queue, idx);
@@ -137,12 +150,17 @@ async function bookEmergency(req, res) {
     const queue = await getQueue(doctorId);
     const row = {
       token, phone, doctor: doctor || 'Front Desk', doctorId: doctorId || null, clientId: clientId || null, time: nowLabel(),
-      tokenType: 'emergency', status: 'PendingApproval', position: null,
+      tokenType: 'emergency', price: req.body.price, status: 'PendingApproval', position: null,
       emergencyType: emergencyType || '', description: description || '', triage,
     };
     queue.push(row);
     renumber(queue);
     await setQueue(queue);
+    try {
+      await sendWhatsApp(req.body.phone || req.user.phone, `Your token ${row.token} booked successfully! Price: ${row.price}`);
+    } catch (error) {
+      console.error('WhatsApp notification failed', error);
+    }
 
     res.status(201).json({
       message: 'Emergency submitted — awaiting staff approval',
@@ -230,4 +248,17 @@ async function getMyTokens(req, res) {
   }
 }
 
-module.exports = { bookToken, getStatus, getMyTokens };
+async function cancelBooking(req, res) {
+  try {
+    const booking = await findToken(req.params.id);
+    if (!booking) return res.status(404).json({ error: 'Booking not found' });
+
+    booking.status = 'cancelled';
+    await setQueue([booking]);
+    return res.json({ message: 'Booking Cancelled' });
+  } catch (e) {
+    return res.status(500).json({ error: String(e.message || e) });
+  }
+}
+
+module.exports = { bookToken, getStatus, getMyTokens, cancelBooking };
