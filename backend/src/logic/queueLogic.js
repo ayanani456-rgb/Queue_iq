@@ -10,9 +10,12 @@
 const ACTIVE = ['Waiting', 'Serving'];
 const isActive = (row) => ACTIVE.includes(row.status);
 
-// The 3:1 rule (PRD §4): an express lets this many active tokens stay ahead,
-// then jumps the rest of the normals.
-const EXPRESS_KEEP_AHEAD = 3;
+// Express priority (PRD §4, tuned): an express lets this many active tokens stay
+// ahead, then jumps the rest of the normals. Set to 2 (was 3) so express gets a
+// visible benefit in short lines too, while still protecting the front two so
+// normals at the head of the queue are never swept away. Tunable via the
+// EXPRESS_KEEP_AHEAD env var.
+const EXPRESS_KEEP_AHEAD = Number(process.env.EXPRESS_KEEP_AHEAD ?? 2);
 
 // Re-number positions by array order. PendingApproval / Rejected rows are NOT in
 // the visible line, so they get position null (they don't occupy a queue slot).
