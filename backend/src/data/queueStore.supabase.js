@@ -122,7 +122,25 @@ async function isEmergencySuspended(phone) {
   return !!(data && data.emergency_suspended);
 }
 
+// Find the latest still-active token booked from a given phone number. Used by
+// the WhatsApp webhook, which only knows the sender's number. Phones are matched
+// loosely (last 10 digits) so "0300-1234567" matches "923001234567".
+async function findTokenByPhone(phone) {
+  const last10 = String(phone || '').replace(/\D/g, '').slice(-10);
+  if (!last10) return null;
+  const { data, error } = await supabase
+    .from('tokens').select('*')
+    .eq('organization_id', ORG_ID)
+    .in('status', ['Waiting', 'Serving', 'PendingApproval'])
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  const row = (data || []).find(
+    (r) => String(r.phone || '').replace(/\D/g, '').slice(-10) === last10,
+  );
+  return row ? fromDb(row) : null;
+}
+
 module.exports = {
-  getQueue, setQueue, findToken, getTokensByClient, nextTokenNumber, getBusiness,
+  getQueue, setQueue, findToken, getTokensByClient, findTokenByPhone, nextTokenNumber, getBusiness,
   recordFalseClaim, isEmergencySuspended, FALSE_CLAIM_LIMIT,
 };

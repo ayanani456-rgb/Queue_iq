@@ -89,7 +89,24 @@ function nextTokenNumber() {
   return `T-${tokenSeq}`;
 }
 
+// Find the latest still-active token booked from a given phone number. Used by
+// the WhatsApp webhook, which only knows the sender's number. Phones are matched
+// loosely (last 10 digits) so "0300-1234567" matches "923001234567".
+const ACTIVE_FOR_CONFIRM = ['Waiting', 'Serving', 'PendingApproval'];
+function samePhone(a, b) {
+  const na = String(a || '').replace(/\D/g, '');
+  const nb = String(b || '').replace(/\D/g, '');
+  if (!na || !nb) return false;
+  return na.slice(-10) === nb.slice(-10);
+}
+function findTokenByPhone(phone) {
+  const matches = queue.filter(
+    (r) => samePhone(r.phone, phone) && ACTIVE_FOR_CONFIRM.includes(r.status),
+  );
+  return matches.length ? matches[matches.length - 1] : null;
+}
+
 module.exports = {
-  getQueue, findToken, getTokensByClient, setQueue, nextTokenNumber, getBusiness,
+  getQueue, findToken, getTokensByClient, findTokenByPhone, setQueue, nextTokenNumber, getBusiness,
   FALSE_CLAIM_LIMIT, recordFalseClaim, isEmergencySuspended,
 };
