@@ -106,7 +106,15 @@ function findTokenByPhone(phone) {
   return matches.length ? matches[matches.length - 1] : null;
 }
 
+// Mock doctors for offline dev (the real list comes from Supabase in production).
+function getDoctors() {
+  return [
+    { id: 'mock-doc-1', name: 'Dr. Ayesha Khan', specialty: 'Cardiology', fee: 2000, experience: 10 },
+    { id: 'mock-doc-2', name: 'Dr. Rabia Hassan', specialty: 'Dermatology', fee: 1500, experience: 7 },
+  ];
+}
+
 module.exports = {
-  getQueue, findToken, getTokensByClient, findTokenByPhone, setQueue, nextTokenNumber, getBusiness,
+  getQueue, findToken, getTokensByClient, findTokenByPhone, getDoctors, setQueue, nextTokenNumber, getBusiness,
   FALSE_CLAIM_LIMIT, recordFalseClaim, isEmergencySuspended,
 };

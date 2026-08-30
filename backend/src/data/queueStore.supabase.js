@@ -140,7 +140,28 @@ async function findTokenByPhone(phone) {
   return row ? fromDb(row) : null;
 }
 
+// List doctors for a hospital/clinic. Used by the WhatsApp AI bot's getDoctors
+// tool. If a name hint is given, resolve the matching organization; otherwise
+// fall back to the configured org.
+async function getDoctors(hospitalHint) {
+  let orgId = ORG_ID;
+  if (hospitalHint) {
+    const { data: orgs } = await supabase
+      .from('organizations').select('id, name')
+      .ilike('name', `%${hospitalHint}%`).limit(1);
+    if (orgs && orgs.length) orgId = orgs[0].id;
+  }
+  const { data, error } = await supabase
+    .from('doctors')
+    .select('id, name, specialty, fee, experience')
+    .eq('organization_id', orgId);
+  if (error) throw error;
+  return (data || []).map((d) => ({
+    id: d.id, name: d.name, specialty: d.specialty, fee: d.fee, experience: d.experience,
+  }));
+}
+
 module.exports = {
-  getQueue, setQueue, findToken, getTokensByClient, findTokenByPhone, nextTokenNumber, getBusiness,
+  getQueue, setQueue, findToken, getTokensByClient, findTokenByPhone, getDoctors, nextTokenNumber, getBusiness,
   recordFalseClaim, isEmergencySuspended, FALSE_CLAIM_LIMIT,
 };
