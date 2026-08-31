@@ -122,7 +122,46 @@ async function isEmergencySuspended(phone) {
   return !!(data && data.emergency_suspended);
 }
 
+// Find the latest still-active token booked from a given phone number. Used by
+// the WhatsApp webhook, which only knows the sender's number. Phones are matched
+// loosely (last 10 digits) so "0300-1234567" matches "923001234567".
+async function findTokenByPhone(phone) {
+  const last10 = String(phone || '').replace(/\D/g, '').slice(-10);
+  if (!last10) return null;
+  const { data, error } = await supabase
+    .from('tokens').select('*')
+    .eq('organization_id', ORG_ID)
+    .in('status', ['Waiting', 'Serving', 'PendingApproval'])
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  const row = (data || []).find(
+    (r) => String(r.phone || '').replace(/\D/g, '').slice(-10) === last10,
+  );
+  return row ? fromDb(row) : null;
+}
+
+// List doctors for a hospital/clinic. Used by the WhatsApp AI bot's getDoctors
+// tool. If a name hint is given, resolve the matching organization; otherwise
+// fall back to the configured org.
+async function getDoctors(hospitalHint) {
+  let orgId = ORG_ID;
+  if (hospitalHint) {
+    const { data: orgs } = await supabase
+      .from('organizations').select('id, name')
+      .ilike('name', `%${hospitalHint}%`).limit(1);
+    if (orgs && orgs.length) orgId = orgs[0].id;
+  }
+  const { data, error } = await supabase
+    .from('doctors')
+    .select('id, name, specialty, fee, experience')
+    .eq('organization_id', orgId);
+  if (error) throw error;
+  return (data || []).map((d) => ({
+    id: d.id, name: d.name, specialty: d.specialty, fee: d.fee, experience: d.experience,
+  }));
+}
+
 module.exports = {
-  getQueue, setQueue, findToken, getTokensByClient, nextTokenNumber, getBusiness,
+  getQueue, setQueue, findToken, getTokensByClient, findTokenByPhone, getDoctors, nextTokenNumber, getBusiness,
   recordFalseClaim, isEmergencySuspended, FALSE_CLAIM_LIMIT,
 };

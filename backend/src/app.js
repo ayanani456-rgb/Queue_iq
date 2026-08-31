@@ -41,6 +41,9 @@ app.use('/api/tokens', bookingRoutes);
 const bookingRateLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
 app.use('/api/bookings', bookingRateLimiter, bookingRoutes);
 
+const whatsappRoutes = require('./routes/whatsapp.routes');
+app.use('/api/whatsapp', whatsappRoutes);
+
 // Health check — open http://localhost:5000/ to confirm the server is alive.
 app.get('/', (req, res) => res.json({ status: 'ok' }));
 app.get('/docs', (req, res) => res.json({ status: 'ok', service: 'QueueIQ backend' }));
