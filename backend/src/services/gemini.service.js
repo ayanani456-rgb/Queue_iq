@@ -1,6 +1,11 @@
 // -----------------------------------------------------------------------------
 // Gemini bot (Layer 2) — the conversational WhatsApp assistant.
 // -----------------------------------------------------------------------------
+// TODO(setup): the Gemini bot is NOT connected yet. Set GEMINI_API_KEY (from
+// aistudio.google.com) on the backend to turn it on. Until then botReply()
+// returns null and the webhook uses the simple Layer 1 fallback reply — safe to
+// ship as-is. The 3 tools (bot.tools.js) already work on live data.
+//
 // Runs a tool-calling loop against Google's Gemini API: the user's message goes
 // in with 3 tool declarations; when Gemini asks to call a tool, we run it on our
 // LIVE data (bot.tools) and feed the result back; when Gemini returns text, we

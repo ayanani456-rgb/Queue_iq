@@ -1,6 +1,11 @@
 // -----------------------------------------------------------------------------
 // WhatsApp sending — Vonage Messages API (sandbox)
 // -----------------------------------------------------------------------------
+// TODO(setup): Vonage sandbox is NOT connected yet. Set VONAGE_API_KEY /
+// VONAGE_API_SECRET / VONAGE_WHATSAPP_FROM on the backend to turn on real
+// sending. Until then every send is a console-log stub (nothing actually leaves
+// the server) — the rest of the app works normally.
+//
 // Real send when the Vonage credentials are configured, otherwise a console-log
 // stub so the app (and demos) still run before any credentials exist.
 //
