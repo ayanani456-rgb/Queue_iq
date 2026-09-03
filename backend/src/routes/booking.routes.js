@@ -2,15 +2,18 @@
 // -----------------------------------------------------------------------------
 // Booking routes
 // -----------------------------------------------------------------------------
-// Mounted at "/api/tokens" in app.js, so the full URLs are:
+// Mounted at "/api/tokens" (and "/api/bookings") in app.js, so the full URLs are:
 //   POST /api/tokens/book
 //   GET  /api/tokens/status/:token
 //   GET  /api/tokens/mine?clientId=…
+//   POST /api/bookings/:id/cancel       -> cancel a booked token
 // -----------------------------------------------------------------------------
 
 const express = require('express');
 const router = express.Router();
-const { bookToken, getStatus, getMyTokens } = require('../controllers/booking.controller');
+const {
+	bookToken, getStatus, getMyTokens, cancelBooking,
+} = require('../controllers/booking.controller');
 
 // WhatsApp integration done via notification.service.js
 router.post('/book', (req, res) => {
@@ -19,5 +22,8 @@ router.post('/book', (req, res) => {
 });
 router.get('/mine', getMyTokens);
 router.get('/status/:token', getStatus);
+
+// Cancel a booking by its token label (e.g. POST /api/bookings/T-109/cancel).
+router.post('/:id/cancel', cancelBooking);
 
 module.exports = router;

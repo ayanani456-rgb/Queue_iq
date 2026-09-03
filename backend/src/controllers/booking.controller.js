@@ -255,7 +255,7 @@ async function cancelBooking(req, res) {
 
     booking.status = 'cancelled';
     await setQueue([booking]);
-    return res.json({ message: 'Booking Cancelled' });
+    return res.json({ message: 'Booking Cancelled', token: booking.token, status: 'cancelled' });
   } catch (e) {
     return res.status(500).json({ error: String(e.message || e) });
   }
