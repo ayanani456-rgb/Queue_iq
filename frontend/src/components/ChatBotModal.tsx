@@ -2,23 +2,6 @@
 
 import { FormEvent, useState, useEffect, useRef } from "react";
 import { CheckCheck, Mic, Paperclip, Send, Smile, X } from "lucide-react";
-import { groqService, ChatHistory } from "@/services/groqService";
-
-const hospitalsData = [
-  {
-    name: "Ziauddin Hospital North Nazimabad",
-    doctors: [
-      { name: "Dr. Ayesha Khan", speciality: "Dermatology", fee: 1500, currentToken: "T-115", yourToken: "T-118", wait: "16 min", available: "Kal 10AM-2PM" },
-      { name: "Dr. Saleem Iqbal", speciality: "Cardiology", fee: 2000, currentToken: "T-42", yourToken: "T-45", wait: "32 min", available: "Aaj 9AM-5PM" },
-    ],
-  },
-  {
-    name: "Mamji Hospital",
-    doctors: [
-      { name: "Dr. Fatima Noor", speciality: "General", fee: 1000, currentToken: "T-28", yourToken: "T-31", wait: "20 min", available: "Aaj 4PM-8PM" },
-    ],
-  },
-];
 
 type ChatMessage = {
   id: string | number;
@@ -43,7 +26,6 @@ export default function ChatBotModal({ isOpen, onClose }: ChatBotModalProps) {
   ]);
   const [message, setMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
-  const [chatHistory, setChatHistory] = useState<ChatHistory>([]);
   const [error, setError] = useState<string | null>(null);
   const [language, setLanguage] = useState<"en" | "ur" | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -96,7 +78,7 @@ export default function ChatBotModal({ isOpen, onClose }: ChatBotModalProps) {
         },
         {
           id: Date.now() + 1,
-          text: "Perfect! 🎯 How can I help you with your appointment or token today?",
+          text: "Perfect! 🎯 How can I help you with your appointment or token today? / آپ کے ٹوکن یا اپائنٹمنٹ کے بارے میں میں آپ کی کیسے مدد کر سکتا ہوں؟",
           sender: "bot",
           time: new Date(),
         },
@@ -117,7 +99,7 @@ export default function ChatBotModal({ isOpen, onClose }: ChatBotModalProps) {
         },
         {
           id: Date.now() + 1,
-          text: "بہترین! 🎯 میں آپ کے اپوائنٹمنٹ یا ٹوکن میں کیسے مدد کر سکتا ہوں؟",
+          text: "بہترین! 🎯 میں آپ کے ٹوکن یا اپائنٹمنٹ کے بارے میں آپ کی مدد کر سکتا ہوں۔ براہ کرم اپنا سوال پوچھیں۔ / Perfect! Ask me anything about your appointment.",
           sender: "bot",
           time: new Date(),
         },
@@ -127,69 +109,93 @@ export default function ChatBotModal({ isOpen, onClose }: ChatBotModalProps) {
     }
 
     if (!language) {
-      setError("پہلے زبان منتخب کریں / Please select a language first");
+      setError("Please select a language first (ENGLISH or URDU)");
       return;
     }
 
     // Add user message
-    const userMsg: ChatMessage = {
-      id: Date.now(),
-      text: msgText,
-      sender: "user",
-      time: new Date(),
-    };
-
-    setMessages((prev) => [...prev, userMsg]);
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: Date.now(),
+        text: msgText,
+        sender: "user",
+        time: new Date(),
+      },
+    ]);
     setMessage("");
     setIsTyping(true);
 
     try {
-      // Build chat history with new message
-      const newHistory: ChatHistory = [
-        ...chatHistory,
-        { role: "user", content: msgText },
-      ];
+      // Convert messages to backend format, filtering out initial language prompts
+      const history = messages
+        .filter((m) => {
+          const text = m.text.toLowerCase();
+          return !text.includes("assalamualaikum") && !text.includes("perfect") && !text.includes("بہترین");
+        })
+        .map((m) => ({
+          role: m.sender === "user" ? "user" : "assistant",
+          content: m.text,
+        }));
 
-      // Get bot response with Groq
-      const reply = await groqService.sendMessage(
-        msgText,
-        newHistory,
-        language === "ur" ? "ur" : "en",
-        hospitalsData
-      );
+      // Call backend chatbot endpoint
+      const response = await fetch("/api/chatbot/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: msgText,
+          language: language || "en",
+          history: history,
+        }),
+      });
 
-      // Add bot response
-      const botMsg: ChatMessage = {
-        id: Date.now() + 1,
-        text: reply,
-        sender: "bot",
-        time: new Date(),
-      };
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP ${response.status}`);
+      }
 
-      setMessages((prev) => [...prev, botMsg]);
-
-      // Update chat history
-      setChatHistory([...newHistory, { role: "assistant", content: reply }]);
+      const data = await response.json();
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now() + 1,
+          text: data.reply,
+          sender: "bot",
+          time: new Date(),
+        },
+      ]);
     } catch (err) {
+      console.error("Chat error:", err);
       setError(
-        err instanceof Error ? err.message : "Failed to get response"
+        err instanceof Error
+          ? err.message
+          : "Failed to send message. Please try again."
       );
-      const errorMsg: ChatMessage = {
-        id: Date.now() + 1,
-        text: language === "ur" 
-          ? "معافی چاہتا ہوں، کوئی خرابی پیش آئی۔ دوبارہ کوشش کریں۔"
-          : "Sorry, I encountered an error. Please try again.",
-        sender: "bot",
-        time: new Date(),
-      };
-      setMessages((prev) => [...prev, errorMsg]);
+
+      // Add error message to chat
+      const errorMsg =
+        language === "ur"
+          ? "معافی چاہتا ہوں، کچھ غلط ہوگیا۔ براہ کرم دوبارہ کوشش کریں۔"
+          : "Sorry, something went wrong. Please try again.";
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now() + 2,
+          text: errorMsg,
+          sender: "bot",
+          time: new Date(),
+        },
+      ]);
     } finally {
       setIsTyping(false);
     }
   };
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const handleFormSubmit = (e: FormEvent) => {
+    e.preventDefault();
     handleSendMessage();
   };
 
@@ -271,7 +277,7 @@ export default function ChatBotModal({ isOpen, onClose }: ChatBotModalProps) {
 
           {error && (
             <div className="flex justify-start">
-              <div className="rounded-lg bg-[#EF4444]/10 px-3 py-2 text-xs text-[#EF4444]">
+              <div className="bg-red-100 border border-red-300 text-red-700 px-3 py-2 rounded-lg text-sm max-w-[85%]">
                 {error}
               </div>
             </div>
@@ -281,45 +287,54 @@ export default function ChatBotModal({ isOpen, onClose }: ChatBotModalProps) {
         </div>
 
         {/* Input Area */}
-        <form
-          onSubmit={handleSubmit}
-          className="flex items-center gap-1.5 bg-[#F0F2F5] p-2.5"
-        >
+        <form onSubmit={handleFormSubmit} className="border-t border-[#CCCCCC] bg-white p-2.5 flex items-center gap-1">
           <button
             type="button"
-            aria-label="Add emoji"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[#54656F] transition hover:bg-[#E1E5E8]"
-          >
-            <Smile size={21} />
-          </button>
-          <button
-            type="button"
-            onClick={handleLocationClick}
-            aria-label="Share location"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[#54656F] transition hover:bg-[#E1E5E8]"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-[#075E54] hover:bg-gray-100"
+            aria-label="Attach file"
           >
             <Paperclip size={20} />
           </button>
+
           <input
             type="text"
+            placeholder={
+              language
+                ? language === "ur"
+                  ? "اپنا سوال لکھیں..."
+                  : "Type your message..."
+                : "Select language first..."
+            }
             value={message}
-            onChange={(event) => setMessage(event.target.value)}
-            placeholder={language ? "Type a message..." : "Select language..."}
-            aria-label="Message"
-            className="min-w-0 flex-1 rounded-full border border-transparent bg-white px-4 py-2.5 text-sm text-[#303030] outline-none placeholder:text-[#667781] focus:border-[#25D366]"
+            onChange={(e) => setMessage(e.target.value)}
             disabled={isTyping}
+            className="flex-1 outline-none px-3 py-2 text-sm disabled:opacity-50 bg-transparent"
           />
+
+          <button
+            type="button"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-[#075E54] hover:bg-gray-100"
+            aria-label="Microphone"
+          >
+            <Mic size={20} />
+          </button>
+
+          <button
+            type="button"
+            onClick={handleLocationClick}
+            className="flex h-8 w-8 items-center justify-center rounded-full text-[#075E54] hover:bg-gray-100"
+            aria-label="Emoji"
+          >
+            <Smile size={20} />
+          </button>
+
           <button
             type="submit"
+            disabled={isTyping || !message.trim()}
+            className="flex h-8 w-8 items-center justify-center rounded-full text-[#075E54] hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
             aria-label="Send message"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#25D366] text-white transition hover:bg-[#20BD5A] disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={!message.trim() || isTyping}
           >
-            {message.trim() ? (
-              <Send size={18} />
-            ) : (
-              <Mic size={20} />
-            )}
+            <Send size={20} />
           </button>
         </form>
       </div>
