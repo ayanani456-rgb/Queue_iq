@@ -1,200 +1,135 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-function generateSmartFallback(formattedMessages: Array<{ role: string; content: string }>): string {
-  const lastUserMsg = formattedMessages
-    .filter((m) => m.role === 'user')
-    .pop()
-    ?.content.toLowerCase()
-    .trim() || '';
-
-  const userMsgCount = formattedMessages.filter((m) => m.role === 'user').length;
-  const allUserText = formattedMessages
-    .filter((m) => m.role === 'user')
-    .map((m) => m.content.toLowerCase())
-    .join(' ');
-
-  // Greetings
-  if (/^(hi|hello|hey|salam|assalam|aoa|slaam)\b/i.test(lastUserMsg) || lastUserMsg === 'hi' || lastUserMsg === 'hello') {
-    if (userMsgCount <= 1) {
-      return "Walaikum Assalam! Kaise hain aap? Al Shifa Clinic mein kis doctor ki appointment ya token chahiye? 😊";
-    }
-    return "Jee batayein, Al Shifa clinic mein kis doctor ka token book karna hai? 😊";
-  }
-
-  // Doctor mentions
-  if (/(ziauddin|bilal|ayesha|ahmed|sana|farhan|hina|usman|mariam|kamran|fatima|imran|nadia|rizwan)/i.test(lastUserMsg)) {
-    const docMatch = lastUserMsg.match(/(dr\s+)?(ziauddin|bilal|ayesha|ahmed|sana|farhan|hina|usman|mariam|kamran|fatima|imran|nadia|rizwan)/i);
-    const docName = docMatch ? `Dr. ${docMatch[2].charAt(0).toUpperCase() + docMatch[2].slice(1)}` : "Doctor";
-    return `Great! ${docName} ke liye appointment ki date aur time bata dein? (Clinic timing: 9AM - 9PM)`;
-  }
-
-  // Date / Time / Confirmation
-  if (/(today|tomorrow|aaj|kal|baje|am|pm|monday|tuesday|wednesday|thursday|friday|saturday|sunday|\d{1,2}:\d{2}|\d{1,2}\s*(am|pm))/i.test(lastUserMsg)) {
-    const randomToken = Math.floor(Math.random() * 90) + 110;
-    return `Perfect! Aapka token Q-${randomToken} book ho gaya hai Al Shifa clinic me. Timing ke mutabiq pohanch jayen. WhatsApp pe confirmation bhej dun? 📲`;
-  }
-
-  // Token inquiries
-  if (/token|appointment|book|line|bari/i.test(lastUserMsg)) {
-    if (/al\s*shifa/i.test(allUserText) || /al\s*shifa/i.test(lastUserMsg)) {
-      return "Jee Al Shifa ke liye kaunse doctor ka token chahiye? Dr Ziauddin (Cardiology), Dr Bilal (Dermatology), Dr Ayesha (Gynae) ya koi aur? 😊";
-    }
-    return "Jee Al Shifa Clinic ka token mil jayega. Kaunse doctor ka chahiye? Dr Ziauddin, Dr Bilal, Dr Ayesha ya koi aur? 😊";
-  }
-
-  // Default natural conversational response
-  if (userMsgCount > 1) {
-    return "Jee bilkul, Al Shifa Clinic me token aur doctor appointment available hai. Doctor ka naam bata dein taake token Q-XXX issue kar doon? 😊";
-  }
-
-  return "Walaikum Assalam! Main QueueIQ Al Shifa assistant hoon. Aap kis doctor ka token ya appointment chahte hain?";
-}
-
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json().catch(() => ({}));
-    const rawMessages = body.messages || (body.message ? [{ role: 'user', content: body.message }] : []);
+    const { messages } = await req.json();
+    const lastMsg = messages[messages.length - 1]?.content?.toLowerCase() || "";
 
-    // Sanitize messages so each has valid role & content
-    const formattedMessages = (Array.isArray(rawMessages) ? rawMessages : [])
-      .map((item: any) => {
-        const role =
-          item.role === 'assistant' || item.sender === 'bot'
-            ? 'assistant'
-            : item.role === 'system'
-            ? 'system'
-            : 'user';
-        const content = String(item.content || item.text || '').trim();
-        return { role, content };
-      })
-      .filter((m: any) => Boolean(m.content));
-
-    // Supabase se doctors lao (backend knowledge)
-    let doctorsList = "Al Shifa Clinic, Karachi - 14 Doctors: Dr Ziauddin (Cardiology), Dr Bilal (Dermatology), Dr Ayesha (Gynae), Dr Ahmed (General), Dr Sana (Peds), Dr Farhan (Ortho), Dr Hina (ENT), Dr Usman (Neuro), Dr Mariam (Eye), Dr Kamran (Dental), Dr Fatima (Physio), Dr Imran (Urology), Dr Nadia (Psych), Dr Rizwan (General). Tokens: Q-001 to Q-200 daily, timing 9AM-9PM.";
-
+    // FETCH ALL ORGANIZATIONS FROM SUPABASE - FULL DB ACCESS
+    let allOrgsText = "";
+    let allDoctorsText = "";
     try {
-      if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-        const supaRes = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/doctors?select=name,specialty`, {
-          headers: {
-            apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-            Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`
-          }
+      const supaUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supaKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+      if (supaUrl && supaKey) {
+        // Fetch organizations
+        const orgRes = await fetch(`${supaUrl}/rest/v1/organizations?select=id,name,type,category,address,description`, {
+          headers: { apikey: supaKey, Authorization: `Bearer ${supaKey}` }
         });
-        if (supaRes.ok) {
-          const docs = await supaRes.json();
-          if (Array.isArray(docs) && docs.length > 0) doctorsList = JSON.stringify(docs);
+        if (orgRes.ok) {
+          const orgs = await orgRes.json();
+          allOrgsText = `ALL ORGANIZATIONS IN QUEUEIQ DB (${orgs.length} total): ${JSON.stringify(orgs).slice(0, 3000)}`;
+
+          // If filter bug - log types
+          console.log("ORG TYPES:", orgs.map((o: any) => `${o.name}:${o.type}`));
+        }
+
+        // Fetch doctors
+        const docRes = await fetch(`${supaUrl}/rest/v1/doctors?select=name,specialty,organization_id`, {
+          headers: { apikey: supaKey, Authorization: `Bearer ${supaKey}` }
+        });
+        if (docRes.ok) {
+          const docs = await docRes.json();
+          allDoctorsText = `ALL DOCTORS: ${JSON.stringify(docs).slice(0, 2000)}`;
         }
       }
-    } catch {}
+    } catch (e) { console.log("Supabase fetch failed, using fallback"); }
+
+    // FALLBACK DATA IF SUPABASE FAILS
+    if (!allOrgsText) {
+      allOrgsText = `
+      Organizations:
+            1. Al Shifa Clinic (type:hospital, category:health) - Cardiology, Dermatology, Gynae doctors, token Q-XXX, 9AM-9PM
+            2. Nadra Gulberg (type:government, category:nadra) - NIC, B-Form, Family Registration Certificate, token N-XXX, 8AM-4PM, docs: Original CNIC, B-Form, photo
+            3. City Medical Center (type:hospital, category:health) - General physicians, lab tests
+            4. Style Salon Gulberg (type:salon, category:beauty) - Haircut, Facial, token S-XXX, 10AM-9PM
+            5. Other hospitals/clinics in DB
+      `;
+    }
 
     const systemPrompt = {
       role: "system",
       content: `
-You are QueueIQ AI - Real Human-like Assistant for QueueIQ Pakistan.
+You are QueueIQ AI - SUPER SMART Assistant for ENTIRE QueueIQ Pakistan (NOT just Al Shifa!)
 
-IDENTITY:
-- Name: QueueIQ AI, Al Shifa Clinic assistant
-- Language: Roman Urdu + English mix, very friendly, human, like ChatGPT
-- You talk like a real Karachi girl - natural, short, helpful, emoji 1-2 max
-- NEVER robotic. NEVER repeat same line.
+YOU KNOW EVERYTHING FROM DATABASE:
+${allOrgsText}
+${allDoctorsText}
 
-CRITICAL MEMORY RULES:
-- You have FULL conversation memory. messages array me sara history hai.
-- If user already greeted, NEVER say "Walaikum Assalam" again. Direct jawab do.
-- If user says "token", "al shifa", "doctor", you REMEMBER context and ask next step, not start over.
-- Example: User1: token chahiye al shifa ki -> You: kaunse doctor? User2: token -> You should NOT repeat greeting, you should say "Jee Al Shifa ke liye kaunse doctor ka token chahiye? Dr Ziauddin?"
+YOUR JOB - LIKE CHATGPT:
+- User kuch bhi poochega - Nadra, Salon, Hospital, NIC, token, doctor, beauty, government service - sab ka jawab hai tumhare paas!
+- NEVER say "Al Shifa ka kaunsa doctor chahiye" unless user is talking about hospital/medical!
+- Understand intent:
+    * If user says "nadra ka batao, nic banwana hai" -> Talk about Nadra Gulberg, token N-XXX, docs needed: B-Form, photo, fees 1000rs, timing 8AM-4PM
+    * If user says "salon" -> Talk about Style Salon, services, token S-XXX
+    * If user says "hospital" / "doctor" -> Then talk about Al Shifa / City Medical
+    * If user says "hi" -> Say "Walaikum Assalam! QueueIQ pe aapko kis cheez me help chahiye? Hospital, Nadra, ya Salon? 😊" - GENERIC, not just Al Shifa!
 
-KNOWLEDGE BASE (Backend connected):
-- You know everything: ${doctorsList}
-- You know all clinics, all doctors, queue system, tokens Q-XXX, N-XXX, S-XXX
-- You can answer ANY question like ChatGPT - clinic timings, doctor fees, specialties, token status, booking process
-- If asked any clinic/doctor, answer from knowledge. If unknown, say "Us clinic ka data abhi add ho raha hai, lekin Al Shifa ka full data hai"
-- You know backend APIs: /api/bookings, /api/tokens
+CRITICAL RULES:
+1. Memory: Full messages array - never repeat greeting after first message
+2. Intent Detection: Pehchano user kya chahta hai - nadra? hospital? salon?
+3. Generic Welcome: First message: "Main aapki QueueIQ pe madad kar sakta hun - hospital token, Nadra NIC, salon booking - kya chahiye?"
+4. Specific Help:
+      - Nadra: N-XXX tokens, NIC renewal, B-Form, FRC - docs, fees, timing
+      - Hospital: Q-XXX tokens, doctors list, 9AM-9PM
+      - Salon: S-XXX tokens, services list, 10AM-9PM
+5. ChatGPT Style: Roman Urdu + English mix, friendly, short 2-3 lines, 1 emoji max
+6. If user asks random like "nic banwana hai" -> Don't say Al Shifa! Say Nadra!
 
-BOOKING FLOW (Human-like):
-1. User: token chahiye -> Ask: "Kaunse doctor ka? Date?"
-2. User: doctor name -> Ask: "Date aur time bata dein?"
-3. Then say: "Perfect! Aapka token Q-${Math.floor(Math.random()*100)+100} book ho gaya hai Al Shifa me Dr XYZ ke paas. 2 baje se pehle ajayen. WhatsApp pe confirmation bhej dun?"
+EXAMPLES:
+User: hi -> "Walaikum Assalam! QueueIQ pe kis cheez ka token chahiye? Hospital, Nadra, ya Salon? 😊"
+User: nadra ka batao -> "Jee Nadra Gulberg me NIC ke liye token N-XXX milta hai. 8AM-4PM. B-Form aur photo le ayen. Fees 1000rs. Kya token book kar dun?"
+User: ayesha -> If previous was Nadra, don't jump to Dr Ayesha! Ask clarification: "Ayesha kis department me? Nadra me ya Al Shifa me Dr Ayesha?"
+User: mujhe nic banwana hai -> "Nadra Gulberg me NIC new/renewal ke liye N-token lagta hai. Aapka token N-45 hai, kal 10 baje ajayen. Documents:..."
 
-STYLE:
-- Like ChatGPT: Smart, understands typos, roman urdu, english, slang
-- Short replies 1-3 lines max, not long paragraphs
-- Always helpful, never say "I don't know" - try to answer
-- If user says "salam" first time only say Walaikum Assalam, after that normal chat
-- Use Roman Urdu: "Jee bilkul", "Ho jayega", "Aapka token ready hai"
-
-NEVER DO:
-- Never repeat greeting
-- Never say "Main aapki appointment aur live token status me madad kar sakta hoon" again and again
-- Never break character
-
-Now continue conversation with full memory.
+You are NOT limited to Al Shifa. You are for ALL.
       `.trim()
     };
 
-    const apiKey = process.env.GROQ_API_KEY;
-
-    if (!apiKey) {
-      const fallbackReply = generateSmartFallback(formattedMessages);
-      return NextResponse.json({ message: fallbackReply, reply: fallbackReply });
-    }
-
+    // Try Groq, fallback to smart rule-based
     try {
+      const apiKey = process.env.GROQ_API_KEY;
+      if (!apiKey) throw new Error("No GROQ_API_KEY");
+
       const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/json"
-        },
+        headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           model: "llama-3.3-70b-versatile",
-          messages: [systemPrompt, ...formattedMessages],
+          messages: [systemPrompt, ...messages.map((m: any) => ({ role: m.role || (m.sender === 'user' ? 'user' : 'assistant'), content: m.content || m.text || '' }))],
           temperature: 0.8,
-          max_tokens: 400,
-          top_p: 0.9
+          max_tokens: 400
         })
       });
 
       if (groqRes.ok) {
         const data = await groqRes.json();
-        const reply = data.choices?.[0]?.message?.content || generateSmartFallback(formattedMessages);
-        return NextResponse.json({ message: reply, reply: reply });
+        const reply = data.choices?.[0]?.message?.content;
+        if (reply) return NextResponse.json({ message: reply, reply: reply });
       }
-
-      // If 70b failed, try 8b instant
-      const fallbackRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model: "llama-3.1-8b-instant",
-          messages: [systemPrompt, ...formattedMessages],
-          temperature: 0.8,
-          max_tokens: 400,
-          top_p: 0.9
-        })
-      });
-
-      if (fallbackRes.ok) {
-        const fallbackData = await fallbackRes.json();
-        const reply = fallbackData.choices?.[0]?.message?.content || generateSmartFallback(formattedMessages);
-        return NextResponse.json({ message: reply, reply: reply });
+      throw new Error("Groq failed");
+    } catch {
+      // SMART FALLBACK - KNOWS ALL ORGS
+      let reply = "";
+      if (lastMsg.includes("hi") || lastMsg.includes("salam") || lastMsg.includes("hello")) {
+        reply = "Walaikum Assalam! QueueIQ pe aapko kis cheez me help chahiye? Hospital token, Nadra NIC, ya Salon booking? 😊";
+      } else if (lastMsg.includes("nadra") || lastMsg.includes("nic") || lastMsg.includes("b-form") || lastMsg.includes("cnic")) {
+        reply = "Nadra Gulberg me NIC / B-Form / FRC ke liye token N-" + (Math.floor(Math.random() * 100) + 10) + " hai. Timing 8AM-4PM. Documents: Original CNIC/B-Form + photo. Fees 1000rs. Book kar dun?";
+      } else if (lastMsg.includes("salon") || lastMsg.includes("hair") || lastMsg.includes("facial") || lastMsg.includes("cut")) {
+        reply = "Style Salon Gulberg me Haircut, Facial, etc ke liye token S-" + (Math.floor(Math.random() * 100) + 10) + " milega. Timing 10AM-9PM. Kaunsi service chahiye?";
+      } else if (lastMsg.includes("hospital") || lastMsg.includes("doctor") || lastMsg.includes("al shifa") || lastMsg.includes("city medical") || lastMsg.includes("token") || lastMsg.includes("ayesha") || lastMsg.includes("zia")) {
+        reply = "Al Shifa / City Medical me Dr. Ayesha, Dr Ziauddin, Dr Bilal available hain. Token Q-" + (Math.floor(Math.random() * 100) + 100) + ". Date aur time bata dein? Clinic 9AM-9PM";
+      } else {
+        reply = "Jee bolen, kya help chahiye? Nadra NIC, Hospital token, ya Salon booking? Mai QueueIQ ka assistant hun, sab ka data hai mere paas! 😊";
       }
-    } catch (groqErr) {
-      console.warn("Groq fetch attempt failed:", groqErr);
+      return NextResponse.json({ message: reply, reply: reply });
     }
 
-    // Smart fallback if API call fails
-    const smartReply = generateSmartFallback(formattedMessages);
-    return NextResponse.json({ message: smartReply, reply: smartReply });
-
   } catch (e: any) {
-    console.error("Chat API Error:", e);
     return NextResponse.json({
-      message: "Walaikum Assalam! Main QueueIQ Al Shifa assistant hoon. Kis doctor ka token book karna hai?",
-      reply: "Walaikum Assalam! Main QueueIQ Al Shifa assistant hoon. Kis doctor ka token book karna hai?"
-    }, { status: 200 });
+      message: "Jee bolen, kis cheez ka token chahiye? Hospital, Nadra, ya Salon? 😊",
+      reply: "Jee bolen, kis cheez ka token chahiye? Hospital, Nadra, ya Salon? 😊"
+    });
   }
 }

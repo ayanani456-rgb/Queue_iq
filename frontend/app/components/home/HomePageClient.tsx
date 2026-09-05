@@ -489,7 +489,14 @@ export default function HomePage() {
 
     const filteredData = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    const filteredData = SALONS_DATA.filter((item) => item.name.toLowerCase().includes(searchQuery.toLowerCase()) && (selectedCategory === 'All' || item.category === selectedCategory));
+    const filteredData = SALONS_DATA.filter((item) => {
+      const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) || item.location.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesCategory =
+        selectedCategory === 'All' ||
+        item.category?.toLowerCase() === selectedCategory.toLowerCase() ||
+        item.type?.toLowerCase() === selectedCategory.toLowerCase();
+      return matchesSearch && matchesCategory;
+    });
     const arr = [...filteredData];
     if (sortBy === 'rating') arr.sort((a, b) => b.rating - a.rating);
     if (sortBy === 'distance') arr.sort((a, b) => a.distance - b.distance);
@@ -1986,7 +1993,7 @@ export default function HomePage() {
                   <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
                     {[
                       { label: 'Health', subtitle: 'Clinics & medical centers', icon: HeartPulse, category: 'Clinic', query: 'Clinic' },
-                      { label: 'Government', subtitle: 'NADRA, banks, offices', icon: Landmark, category: 'Hospital', query: 'NADRA' },
+                      { label: 'Government', subtitle: 'NADRA, banks, offices', icon: Landmark, category: 'Government', query: 'NADRA' },
                       { label: 'Beauty', subtitle: 'Salons & spas', icon: Scissors, category: 'Salon', query: 'Salon' },
                       { label: 'Dining', subtitle: 'Restaurants & cafés', icon: UtensilsCrossed, category: 'All', query: '' },
                       { label: 'Retail', subtitle: 'Stores & showrooms', icon: ShoppingBag, category: 'All', query: '' },

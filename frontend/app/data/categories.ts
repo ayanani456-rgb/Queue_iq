@@ -1,1 +1,1 @@
-export const categories = ["All", "Salon", "Hospital", "Clinic", "Spa"];
+export const categories = ["All", "Clinic", "Hospital", "Salon", "Government", "Bank", "Lab"];
