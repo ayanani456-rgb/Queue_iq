@@ -870,7 +870,7 @@ export default function HomePage() {
     if (!orgId) orgId = REAL_ORG_ID;
     try {
       const { data: depts } = await supabase.from('departments').select('id,name,icon').eq('organization_id', orgId).order('name');
-      let docQuery = supabase.from('doctors').select('id,name,department_id,specialty,fee,experience').eq('organization_id', orgId).order('name');
+      let docQuery = supabase.from('doctors').select('id,name,department_id,specialty,fee,experience,bio,schedule').eq('organization_id', orgId).order('name');
       if (user?.role === 'receptionist' && user?.departmentId) docQuery = docQuery.eq('department_id', user.departmentId);
       const { data: docs } = await docQuery;
       const deptList = depts || [];
@@ -1950,13 +1950,17 @@ export default function HomePage() {
           {(() => {
             const currentDept = bizDepartments.find((d: any) => d.id === (selectedDoctor?.department_id || bizDeptId));
             const doctorSpecialty = selectedDoctor?.specialty || selectedDoctor?.specialization || currentDept?.name || 'Cardiologist';
+            const doctorTiming = selectedDoctor?.schedule?.when || selectedDoctor?.schedule?.label || '02:00 PM - 03:00 AM';
             return (
               <DoctorQueue
                 key={selectedDoctor?.id || bizDoctorId || currentBusiness?.doctorId || 'doc-queue'}
-                doctorId={selectedDoctor?.id || currentBusiness?.doctorId || '024f24eb-a440-4079-acb3-ad8cffe85015'}
-                doctorName={selectedDoctor?.name || currentBusiness?.doctorName || 'Dr. Ayesha'}
+                doctorId={selectedDoctor?.id || currentBusiness?.doctorId || '92fc75e6-645d-4889-a856-902bb15be43d'}
+                doctorName={selectedDoctor?.name || currentBusiness?.doctorName || 'Dr. Rabia Hassan'}
                 specialty={doctorSpecialty}
-                fee={selectedDoctor?.fee || 800}
+                fee={selectedDoctor?.fee || 1800}
+                bio={selectedDoctor?.bio}
+                timing={doctorTiming}
+                experience={selectedDoctor?.experience}
                 organizationId={REAL_ORG_ID}
                 organizationName="Al-Shifa Clinic"
               />

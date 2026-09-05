@@ -24,8 +24,10 @@ const DR_AYESHA = {
   organization_id: 'bcb69e0a-b1e1-4f03-8184-1017d8e8e9eb',
   organization_name: 'Al-Shifa Clinic',
   room: 'Consultation Room 3',
-  timing: '02:00 PM - 03:00 AM (Demo Live)',
-  fee: 'Rs. 500',
+  timing: '02:00 PM - 03:00 AM',
+  fee: 500,
+  experience: '8+ years',
+  bio: 'Specialist Gynecologist with expertise in maternal health and obstetrics.',
   isDemo: true,
 };
 
@@ -108,6 +110,10 @@ export default function DoctorDashboardPage() {
           doctorId={selectedDoctor.id}
           doctorName={selectedDoctor.name}
           specialty={selectedDoctor.specialty}
+          fee={selectedDoctor.fee}
+          bio={selectedDoctor.bio}
+          timing={selectedDoctor.timing}
+          experience={selectedDoctor.experience}
           organizationId={selectedDoctor.organization_id}
           organizationName={selectedDoctor.organization_name}
         />

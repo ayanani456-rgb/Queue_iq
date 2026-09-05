@@ -36,6 +36,9 @@ interface DoctorQueueProps {
   doctorName?: string;
   specialty?: string;
   fee?: number | string;
+  bio?: string;
+  timing?: string;
+  experience?: number | string;
   organizationId?: string;
   organizationName?: string;
 }
@@ -156,6 +159,9 @@ export default function DoctorQueue({
   doctorName = 'Dr. Rabia Hassan',
   specialty = 'Cardiologist',
   fee = 1800,
+  bio,
+  timing,
+  experience,
   organizationId = DEFAULT_ORG_ID,
   organizationName = 'Al-Shifa Clinic',
 }: DoctorQueueProps) {
@@ -386,10 +392,17 @@ export default function DoctorQueue({
                   <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
                   Live On Duty
                 </span>
+                {experience ? (
+                  <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-medium text-slate-600">
+                    {experience} {String(experience).includes('year') ? '' : 'years'} exp
+                  </span>
+                ) : null}
               </div>
               <p className="text-sm font-medium text-slate-500">
                 <span className="font-semibold text-slate-700">{specialty}</span> • {organizationName} • Rs. {fee || 800}
+                {timing ? ` • Timing: ${timing}` : ''}
               </p>
+              {bio ? <p className="mt-1 text-xs text-slate-500 max-w-xl line-clamp-1">{bio}</p> : null}
             </div>
           </div>
 
