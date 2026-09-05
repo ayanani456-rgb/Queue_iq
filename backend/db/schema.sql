@@ -39,7 +39,7 @@ alter table public.tokens
   add column if not exists doctor_id uuid references public.doctors(id) on delete set null,
   add column if not exists phone text,
   add column if not exists status text not null default 'Waiting'
-    check (status in ('Waiting','Serving','Done','Skipped','PendingApproval','Rejected')),
+    check (status in ('Waiting','Serving','Done','Skipped','PendingApproval','Rejected','Cancelled')),
   add column if not exists position int,
   add column if not exists slot_time text,
   -- emergency triage (nullable — only set for emergency tokens)
