@@ -724,7 +724,6 @@ export default function HomePage() {
   // harness): doctor -> just self; receptionist -> their department; owner -> all.
   const loadBizRoster = async (user: any) => {
     setBizErr('');
-    const orgId = user?.orgId || REAL_ORG_ID;
     if (user?.role === 'doctor') {
       setBizDepartments([]);
       setBizDoctors([{ id: user.doctorId, name: user.doctorName || 'My line', department_id: user.departmentId }]);
@@ -732,6 +731,16 @@ export default function HomePage() {
       setBizDoctorId(user.doctorId || null);
       return;
     }
+    // login() returns org_slug (not organization_id) — resolve the id from it,
+    // falling back to the configured org so a single-clinic demo still works.
+    let orgId = user?.orgId || null;
+    if (!orgId && user?.orgSlug) {
+      try {
+        const { data } = await supabase.from('organizations').select('id').eq('slug', user.orgSlug).maybeSingle();
+        orgId = data?.id || null;
+      } catch (e) { /* fall back below */ }
+    }
+    if (!orgId) orgId = REAL_ORG_ID;
     try {
       const { data: depts } = await supabase.from('departments').select('id,name,icon').eq('organization_id', orgId).order('name');
       let docQuery = supabase.from('doctors').select('id,name,department_id').eq('organization_id', orgId).order('name');
