@@ -16,10 +16,7 @@ const {
 } = require('../controllers/booking.controller');
 
 // WhatsApp integration done via notification.service.js
-router.post('/book', (req, res) => {
-	console.log('WhatsApp integration OK - Backend connected');
-	return bookToken(req, res);
-});
+router.post('/book', bookToken);
 router.get('/mine', getMyTokens);
 router.get('/status/:token', getStatus);
 

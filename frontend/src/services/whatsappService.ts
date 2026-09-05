@@ -11,6 +11,9 @@ export const whatsappService = {
         body: JSON.stringify({ phone, message }),
       });
 
+      if (!response.ok) {
+        throw new Error(`Failed to send message: ${response.status}`);
+      }
       return response.json();
     } catch (error) {
       console.error("Failed to send WhatsApp message:", error);
@@ -18,25 +21,15 @@ export const whatsappService = {
     }
   },
 
-  async getLiveDoctors(hospital?: string, speciality?: string) {
-    try {
-      const response = await fetch(
-        `${API_BASE}/api/doctors?hospital=${hospital}&speciality=${speciality}`,
-      );
-
-      return response.json();
-    } catch (error) {
-      console.error("Failed to fetch live doctors:", error);
-      throw error;
-    }
-  },
-
   async getQueueStatus(doctorId: string) {
     try {
       const response = await fetch(
-        `${API_BASE}/api/queue/status?doctorId=${doctorId}`,
+        `${API_BASE}/api/business/tokens?doctorId=${doctorId}`,
       );
 
+      if (!response.ok) {
+        throw new Error(`Failed to fetch queue status: ${response.status}`);
+      }
       return response.json();
     } catch (error) {
       console.error("Failed to fetch queue status:", error);
@@ -44,19 +37,26 @@ export const whatsappService = {
     }
   },
 
-  async generateToken(doctorId: string, phone: string, type: string) {
+  async bookToken(doctorId: string, phone: string, type: string) {
     try {
-      const response = await fetch(`${API_BASE}/api/tokens/generate`, {
+      const response = await fetch(`${API_BASE}/api/tokens/book`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ doctorId, phone, type }),
+        body: JSON.stringify({ 
+          doctor_id: doctorId, 
+          phone, 
+          tokenType: type 
+        }),
       });
 
+      if (!response.ok) {
+        throw new Error(`Failed to book token: ${response.status}`);
+      }
       return response.json();
     } catch (error) {
-      console.error("Failed to generate token:", error);
+      console.error("Failed to book token:", error);
       throw error;
     }
   },

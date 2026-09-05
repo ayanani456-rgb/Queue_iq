@@ -27,6 +27,16 @@ let queue = [
   { token: 'A-17', phone: '0303-4567890', doctor: 'Dr. Ayesha Khan', time: '11:00', tokenType: 'normal', position: 4, status: 'Waiting' },
 ];
 
+// Simple in-memory lock to prevent race conditions on queue modification
+let queueLock = Promise.resolve();
+
+// Helper to run operations atomically on the queue
+async function withQueueLock(operation) {
+  return queueLock = queueLock.then(async () => {
+    return operation();
+  });
+}
+
 // New bookings get a unique, ever-increasing token number: T-101, T-102, ...
 // Using a running counter (instead of the position) makes the point obvious:
 // the token number is a permanent ID, the position is separate and can move.
@@ -60,27 +70,35 @@ function isEmergencySuspended(phone) {
 }
 
 // Return ONE doctor's line (doctorId falsy -> the generic, no-doctor line).
-function getQueue(doctorId) {
-  return doctorId
-    ? queue.filter((row) => row.doctorId === doctorId)
-    : queue.filter((row) => !row.doctorId);
+async function getQueue(doctorId) {
+  return withQueueLock(() => {
+    return doctorId
+      ? queue.filter((row) => row.doctorId === doctorId)
+      : queue.filter((row) => !row.doctorId);
+  });
 }
 
 // Find one row by its token label, across all doctors.
-function findToken(token) {
-  return queue.find((row) => row.token === token);
+async function findToken(token) {
+  return withQueueLock(() => {
+    return queue.find((row) => row.token === token);
+  });
 }
 
 // All tokens a given client booked.
-function getTokensByClient(clientId) {
-  return queue.filter((row) => row.clientId === clientId);
+async function getTokensByClient(clientId) {
+  return withQueueLock(() => {
+    return queue.filter((row) => row.clientId === clientId);
+  });
 }
 
 // Merge a doctor's line back in (upsert by token; other lines untouched).
-function setQueue(next) {
-  const map = new Map(queue.map((r) => [r.token, r]));
-  for (const r of next) map.set(r.token, r);
-  queue = [...map.values()];
+async function setQueue(next) {
+  return withQueueLock(() => {
+    const map = new Map(queue.map((r) => [r.token, r]));
+    for (const r of next) map.set(r.token, r);
+    queue = [...map.values()];
+  });
 }
 
 // Hand out the next unique token number.
@@ -116,5 +134,5 @@ function getDoctors() {
 
 module.exports = {
   getQueue, findToken, getTokensByClient, findTokenByPhone, getDoctors, setQueue, nextTokenNumber, getBusiness,
-  FALSE_CLAIM_LIMIT, recordFalseClaim, isEmergencySuspended,
+  FALSE_CLAIM_LIMIT, recordFalseClaim, isEmergencySuspended, withQueueLock,
 };
