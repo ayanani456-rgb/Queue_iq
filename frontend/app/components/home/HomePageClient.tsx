@@ -173,8 +173,11 @@ function scheduleToText(schedule: any[]) {
 }
 
 function getClinicById(clinicId: string | undefined) {
-  if (!clinicId) return undefined;
-  return CLINICS[clinicId as keyof typeof CLINICS];
+  if (!clinicId) return CLINICS.alshifa;
+  const cid = String(clinicId).toLowerCase();
+  if (cid === 'citymedical' || cid.includes('city')) return CLINICS.citymedical;
+  if (cid === 'alshifa' || cid.includes('shif')) return CLINICS.alshifa;
+  return CLINICS[clinicId as keyof typeof CLINICS] || CLINICS.alshifa;
 }
 
 const categoryIcons = {
@@ -663,8 +666,30 @@ export default function HomePage() {
     setPaymentSuccess(false);
     setShowBookingOverlay(true);
     setShowBookingModal(true);
-    const clinicId = org.clinicId || null;
-    setBookingState({ flow: org.type === 'clinic' ? 'clinic' : 'generic', org, clinicId, deptId: org.type === 'clinic' ? 'all' : undefined, step: org.type === 'clinic' ? 'clinic-detail' : (org.status === 'closed' ? 'g-date' : 'g-category') });
+
+    const orgType = (org.type || '').toLowerCase();
+    const orgCat = (org.category || '').toLowerCase();
+    const orgName = (org.name || '').toLowerCase();
+
+    const isClinicOrHospital =
+      Boolean(org.clinicId) ||
+      orgType === 'clinic' ||
+      orgType === 'hospital' ||
+      orgCat === 'clinic' ||
+      orgCat === 'hospital' ||
+      orgName.includes('clinic') ||
+      orgName.includes('medical') ||
+      orgName.includes('shifa');
+
+    const clinicId = org.clinicId || (orgName.includes('city') ? 'citymedical' : 'alshifa');
+
+    setBookingState({
+      flow: isClinicOrHospital ? 'clinic' : 'generic',
+      org,
+      clinicId: isClinicOrHospital ? clinicId : null,
+      deptId: isClinicOrHospital ? 'all' : undefined,
+      step: isClinicOrHospital ? 'clinic-detail' : (org.status === 'closed' ? 'g-date' : 'g-category')
+    });
     setBookingPhone('');
     setBookingPhoneCode('+92');
     setBookingPhoneValid(false);

@@ -8,6 +8,8 @@ export const STATUS_MAP = {
 };
 
 export const CATEGORY_MAP = {
+  clinic: [{ icon: '🫀', label: 'Cardiology' }, { icon: '🧴', label: 'Dermatology' }, { icon: '🏥', label: 'General Physician' }, { icon: '🦷', label: 'Dentist' }, { icon: '🧠', label: 'Neurology' }, { icon: '🦴', label: 'Orthopedic' }],
+  hospital: [{ icon: '🫀', label: 'Cardiology' }, { icon: '🧴', label: 'Dermatology' }, { icon: '🏥', label: 'General Physician' }, { icon: '🦷', label: 'Dentist' }, { icon: '🧠', label: 'Neurology' }, { icon: '🦴', label: 'Orthopedic' }],
   bank: [{ icon: '💰', label: 'Account Opening' }, { icon: '📋', label: 'Loan Inquiry' }, { icon: '💳', label: 'Card Services' }, { icon: '🏦', label: 'Cash Deposit/Withdrawal' }],
   salon: [{ icon: '✂', label: 'Haircut' }, { icon: '💆', label: 'Massage' }, { icon: '💅', label: 'Manicure/Pedicure' }],
   lab: [{ icon: '🧪', label: 'Blood Test' }, { icon: '🩻', label: 'X-Ray' }, { icon: '🫀', label: 'ECG' }, { icon: '🧬', label: 'Full Body Checkup' }],
