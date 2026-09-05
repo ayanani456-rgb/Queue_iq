@@ -87,7 +87,7 @@ You are NOT limited to Al Shifa. You are for ALL.
       `.trim()
     };
 
-    // Try Groq, fallback to smart rule-based
+    // Try Groq first if key exists, fallback to conversational engine
     try {
       const apiKey = process.env.GROQ_API_KEY;
       if (!apiKey) throw new Error("No GROQ_API_KEY");
@@ -97,39 +97,90 @@ You are NOT limited to Al Shifa. You are for ALL.
         headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           model: "llama-3.3-70b-versatile",
-          messages: [systemPrompt, ...messages.map((m: any) => ({ role: m.role || (m.sender === 'user' ? 'user' : 'assistant'), content: m.content || m.text || '' }))],
-          temperature: 0.8,
-          max_tokens: 400
+          messages: [
+            systemPrompt,
+            ...messages.map((m: any) => ({
+              role: m.role || (m.sender === 'user' ? 'user' : 'assistant'),
+              content: m.content || m.text || ''
+            }))
+          ],
+          temperature: 0.7,
+          max_tokens: 450
         })
       });
 
       if (groqRes.ok) {
         const data = await groqRes.json();
         const reply = data.choices?.[0]?.message?.content;
-        if (reply) return NextResponse.json({ message: reply, reply: reply });
+        if (reply) return NextResponse.json({ message: reply, reply });
       }
-      throw new Error("Groq failed");
+      throw new Error("Groq API error");
     } catch {
-      // SMART FALLBACK - KNOWS ALL ORGS
-      let reply = "";
-      if (lastMsg.includes("hi") || lastMsg.includes("salam") || lastMsg.includes("hello")) {
-        reply = "Walaikum Assalam! QueueIQ pe aapko kis cheez me help chahiye? Hospital token, Nadra NIC, ya Salon booking? 😊";
-      } else if (lastMsg.includes("nadra") || lastMsg.includes("nic") || lastMsg.includes("b-form") || lastMsg.includes("cnic")) {
-        reply = "Nadra Gulberg me NIC / B-Form / FRC ke liye token N-" + (Math.floor(Math.random() * 100) + 10) + " hai. Timing 8AM-4PM. Documents: Original CNIC/B-Form + photo. Fees 1000rs. Book kar dun?";
-      } else if (lastMsg.includes("salon") || lastMsg.includes("hair") || lastMsg.includes("facial") || lastMsg.includes("cut")) {
-        reply = "Style Salon Gulberg me Haircut, Facial, etc ke liye token S-" + (Math.floor(Math.random() * 100) + 10) + " milega. Timing 10AM-9PM. Kaunsi service chahiye?";
-      } else if (lastMsg.includes("hospital") || lastMsg.includes("doctor") || lastMsg.includes("al shifa") || lastMsg.includes("city medical") || lastMsg.includes("token") || lastMsg.includes("ayesha") || lastMsg.includes("zia")) {
-        reply = "Al Shifa / City Medical me Dr. Ayesha, Dr Ziauddin, Dr Bilal available hain. Token Q-" + (Math.floor(Math.random() * 100) + 100) + ". Date aur time bata dein? Clinic 9AM-9PM";
-      } else {
-        reply = "Jee bolen, kya help chahiye? Nadra NIC, Hospital token, ya Salon booking? Mai QueueIQ ka assistant hun, sab ka data hai mere paas! 😊";
-      }
-      return NextResponse.json({ message: reply, reply: reply });
-    }
+      // SMART CONVERSATIONAL ENGINE WITH MULTI-TURN MEMORY
+      const fullHistoryText = messages.map((m: any) => (m.content || m.text || '').toLowerCase()).join(" ");
+      const msg = lastMsg.trim().toLowerCase();
 
+      let reply = "";
+
+      // Check specific queries FIRST (to prevent greetings or broad words from hijacking)
+      if (/\b(al[-\s]?shifa|shifa)\b/i.test(msg)) {
+        if (/\b(ayesha|gynae|gynecolog)/i.test(msg) || fullHistoryText.includes('ayesha')) {
+          reply = "Al-Shifa Clinic mein Dr. Ayesha Khan (Gynecologist) active hain (Timing: 02:00 PM - 03:00 AM). Current live token Q-112 chal raha hai. Aap direct homepage se token book kar sakte hain!";
+        } else if (/\b(cardio|heart|rabia|salman)\b/i.test(msg)) {
+          reply = "Al-Shifa Clinic Cardiology department mein Dr. Rabia Hassan (Fee: Rs. 1800) aur Dr. Salman Iqbal available hain. Current queue Q-112 chal rahi hai.";
+        } else if (/\b(derma|skin|zoya|omar)\b/i.test(msg)) {
+          reply = "Al-Shifa Clinic Dermatology mein Dr. Zoya Ahmed (Fee: Rs. 1400) aur Dr. Omar Siddiqui available hain. Live token Q-114 chal raha hai.";
+        } else if (/\b(dent|teeth|hina|bilal)\b/i.test(msg)) {
+          reply = "Al-Shifa Dentistry department mein Dr. Hina Yousuf aur Dr. Bilal Tariq available hain (Fee: Rs. 1200).";
+        } else {
+          reply = "Al-Shifa Clinic mein Cardiology (Dr. Rabia), Gynecology (Dr. Ayesha), Dermatology (Dr. Zoya), Dentistry (Dr. Hina), aur General Medicine ke doctors available hain. Aapko kis doctor ya department ka token chahiye?";
+        }
+      } else if (/\b(city[-\s]?medical|city\s*med)\b/i.test(msg)) {
+        reply = "City Medical Center mein General Physicians aur Diagnostic Lab tests available hain. Timing: 9:00 AM - 9:00 PM. Token Q-series mein issue hota hai.";
+      } else if (/\b(dr\.?|doctor|doctors)\b/i.test(msg)) {
+        if (/\b(ayesha)\b/i.test(msg)) {
+          reply = "Dr. Ayesha Khan (Gynecologist) Al-Shifa Clinic mein available hain. Timing: 02:00 PM - 03:00 AM (Room 3, Fee: Rs. 500). Live Token Q-112!";
+        } else if (/\b(rabia)\b/i.test(msg)) {
+          reply = "Dr. Rabia Hassan (Cardiologist) Al-Shifa Clinic mein available hain. Fee: Rs. 1800. Serving Token Q-112, Waiting Token Q-113.";
+        } else if (/\b(salman)\b/i.test(msg)) {
+          reply = "Dr. Salman Iqbal (Cardiologist) Al-Shifa Clinic mein available hain. Serving Token Q-115.";
+        } else if (/\b(zoya)\b/i.test(msg)) {
+          reply = "Dr. Zoya Ahmed (Dermatologist) Al-Shifa Clinic mein available hain. Serving Token Q-114.";
+        } else {
+          reply = "Al-Shifa Clinic ke main specialist doctors:\n• Dr. Ayesha Khan (Gynecologist - Room 3)\n• Dr. Rabia Hassan (Cardiologist)\n• Dr. Salman Iqbal (Cardiologist)\n• Dr. Zoya Ahmed (Dermatologist)\n• Dr. Hina Yousuf (Dentist)\nKiske liye token book karna chahte hain?";
+        }
+      } else if (/\b(nadra|nic|cnic|b[-\s]?form|frc)\b/i.test(msg)) {
+        const randToken = "N-" + (Math.floor(Math.random() * 80) + 120);
+        reply = `NADRA Gulberg Centre mein New NIC, Renewal, aur B-Form ke liye token ${randToken} issue hota hai. Timing: 8:00 AM - 4:00 PM. Zaruri documents: Original CNIC / B-Form + Photographs. Fees: Rs. 1000.`;
+      } else if (/\b(salon|hair|facial|beard|spa|style\s*salon)\b/i.test(msg)) {
+        const randToken = "S-" + (Math.floor(Math.random() * 50) + 101);
+        reply = `Style Salon Gulberg mein Haircut, Beard Styling, aur Facial ke liye token ${randToken} milta hai. Timing: 10:00 AM - 9:00 PM. Aap kis service ke liye aana chahte hain?`;
+      } else if (/\b(hospital|clinic|appointment|checkup)\b/i.test(msg)) {
+        reply = "QueueIQ par Al-Shifa Clinic aur City Medical Center registered hain. Cardiology, Gynecology, Dermatology, Dentistry aur General OPD ke live tokens (Q-series) available hain. Kis clinic ya doctor ka token chahiye?";
+      } else if (/\b(token|book|booking|queue)\b/i.test(msg)) {
+        if (fullHistoryText.includes('nadra') || fullHistoryText.includes('nic')) {
+          reply = "NADRA token ke liye homepage par 'NADRA Gulberg' search karein, apna WhatsApp number daalein aur N-token instant generate ho jayega.";
+        } else if (fullHistoryText.includes('salon')) {
+          reply = "Style Salon ka token book karne ke liye category mein 'Beauty' ya search mein 'Style Salon' choose karein!";
+        } else {
+          reply = "Token book karne ke liye search bar mein clinic ya service ka naam search karein (maslan 'Al-Shifa Clinic'), doctor select karein aur WhatsApp number enter karein. Aapko live token mil jayega!";
+        }
+      } else if (/\b(fee|fees|charges|price|paisa|cost)\b/i.test(msg)) {
+        reply = "Consultation fees:\n• Dr. Ayesha Khan (Gynecology): Rs. 500\n• Dr. Rabia Hassan (Cardiology): Rs. 1800\n• Dr. Zoya Ahmed (Dermatology): Rs. 1400\n• Dr. Hina Yousuf (Dentist): Rs. 1200\n• NADRA NIC processing: Rs. 1000";
+      } else if (/\b(timing|time|hours|open|kab)\b/i.test(msg)) {
+        reply = "Timings:\n• Al-Shifa Clinic: 9:00 AM - 9:00 PM (Dr. Ayesha Demo Live: 2:00 PM - 3:00 AM)\n• NADRA Gulberg: 8:00 AM - 4:00 PM\n• Style Salon: 10:00 AM - 9:00 PM";
+      } else if (/^(hi|hello|hey|salam|assalam|aoa|salam\s*alaikum|assalam-o-alaikum)$/i.test(msg) || /^(hi|hello|hey|salam)\b/i.test(msg)) {
+        reply = "Walaikum Assalam! QueueIQ Assistant mein khush-aamdeed. Aapko kis cheez ka live token chahiye? Hospital/Clinic, NADRA, ya Salon? 😊";
+      } else {
+        reply = "Jee farmayein! Main QueueIQ AI Assistant hoon. Main aapko Al-Shifa Clinic doctors, NADRA Gulberg NIC tokens, aur Style Salon bookings mein guide kar sakta hoon. Aapko kis service ke baare mein jan-na hai?";
+      }
+
+      return NextResponse.json({ message: reply, reply });
+    }
   } catch (e: any) {
     return NextResponse.json({
-      message: "Jee bolen, kis cheez ka token chahiye? Hospital, Nadra, ya Salon? 😊",
-      reply: "Jee bolen, kis cheez ka token chahiye? Hospital, Nadra, ya Salon? 😊"
+      message: "Jee bolen, kis cheez ka token chahiye? Hospital (Al-Shifa), Nadra, ya Salon? 😊",
+      reply: "Jee bolen, kis cheez ka token chahiye? Hospital (Al-Shifa), Nadra, ya Salon? 😊"
     });
   }
 }

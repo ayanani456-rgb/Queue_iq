@@ -81,15 +81,29 @@ Guidelines:
     ];
 
     if (!apiKey) {
-      const isUrdu =
-        language === "ur" ||
-        /[\u0600-\u06FF]/.test(userMessage) ||
-        /\b(kya|kaise|hai|salam|mujhe|doctor|token|apointment|chahiye|kitna|waqt)\b/i.test(userMessage);
+      const msg = userMessage.trim().toLowerCase();
+      let reply = "";
+
+      if (/\b(al[-\s]?shifa|shifa)\b/i.test(msg)) {
+        if (/\b(ayesha|gynae|gynecolog)/i.test(msg)) {
+          reply = "Al-Shifa Clinic mein Dr. Ayesha Khan (Gynecologist) available hain. Live token Q-112! Timing: 02:00 PM - 03:00 AM.";
+        } else if (/\b(cardio|heart|rabia|salman)\b/i.test(msg)) {
+          reply = "Al-Shifa Clinic Cardiology department mein Dr. Rabia Hassan (Fee: Rs. 1800) aur Dr. Salman Iqbal available hain. Queue Q-112.";
+        } else {
+          reply = "Al-Shifa Clinic mein Cardiology (Dr. Rabia), Gynecology (Dr. Ayesha), Dermatology (Dr. Zoya), Dentistry (Dr. Hina) aur General Medicine ke doctors available hain.";
+        }
+      } else if (/\b(nadra|nic|cnic|b[-\s]?form|frc)\b/i.test(msg)) {
+        reply = "NADRA Gulberg Centre mein New NIC, Renewal, aur B-Form ke liye token N-series issue hota hai. Timing: 8:00 AM - 4:00 PM. Fee: Rs. 1000.";
+      } else if (/\b(salon|hair|facial|beard|spa)\b/i.test(msg)) {
+        reply = "Style Salon Gulberg mein Haircut, Facial, aur Grooming ke liye S-tokens issue hote hain. Timing: 10:00 AM - 9:00 PM.";
+      } else if (/^(hi|hello|hey|salam|assalam|aoa)\b/i.test(msg)) {
+        reply = "Walaikum Assalam! Main QueueIQ AI Assistant hoon. Main aapki clinic token (Q-series), NADRA (N-series), aur salon booking (S-series) mein madad kar sakta hoon.";
+      } else {
+        reply = "Main QueueIQ Assistant hoon. Aap Al-Shifa Clinic, NADRA Gulberg, aur Style Salon ke tokens aur timings ke baare mein pooch sakte hain.";
+      }
 
       return NextResponse.json({
-        reply: isUrdu
-          ? "Walaikum Assalam! Main QueueIQ AI assistant hoon. Main aapki doctor appointment, token booking (Q-XXX), aur live queue status mein madad kar sakta hoon. Aap kis doctor ya hospital ke baare mein jan-na chahte hain?"
-          : "Hello! I am your QueueIQ AI Assistant. I can help you with doctor appointments, token bookings, and queue wait times. How may I assist you today?",
+        reply,
         language,
         hospitalsData: HOSPITALS_DATA,
         timestamp: new Date(),
