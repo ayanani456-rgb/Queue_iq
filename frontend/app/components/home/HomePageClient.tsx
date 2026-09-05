@@ -258,8 +258,15 @@ export default function HomePage() {
 
   const getApiHeaders = async () => {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    const { data } = await supabase.auth.getSession();
-    if (data.session?.access_token) headers.Authorization = `Bearer ${data.session.access_token}`;
+    // Prefer the staff JWT issued by our backend (POST /api/auth/login); fall back
+    // to a Supabase session token if one exists.
+    let token: string | null = null;
+    if (typeof window !== 'undefined') token = localStorage.getItem('queueiq_staff_token');
+    if (!token) {
+      const { data } = await supabase.auth.getSession();
+      token = data.session?.access_token || null;
+    }
+    if (token) headers.Authorization = `Bearer ${token}`;
     return headers;
   };
 
@@ -660,7 +667,7 @@ export default function HomePage() {
     }, 700);
   };
 
-  const businessLogin = () => {
+  const businessLogin = async () => {
     const account = BUSINESS_ACCOUNTS[businessEmail as keyof typeof BUSINESS_ACCOUNTS];
     if (!account || account.password !== businessPassword) {
       setBizError('Invalid email or password.');
@@ -670,6 +677,23 @@ export default function HomePage() {
     setBizError('');
     setCurrentBusiness({ email: businessEmail, ...account });
     setShowContactModal(false);
+    // Best-effort: fetch a backend JWT so the protected /api/business/* endpoints
+    // can be called. The local demo login still works even if this fails.
+    try {
+      const res = await fetch(`${API_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: businessEmail, password: businessPassword }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.token && typeof window !== 'undefined') {
+          localStorage.setItem('queueiq_staff_token', data.token);
+        }
+      }
+    } catch (err) {
+      console.warn('Backend staff login unavailable:', err);
+    }
     if (typeof window !== 'undefined') {
       const seed = localStorage.getItem('queueiq_queue_SHIF');
       if (seed) setBusinessQueue(JSON.parse(seed));
@@ -681,6 +705,7 @@ export default function HomePage() {
     setBusinessEmail('');
     setBusinessPassword('');
     setBizError('');
+    if (typeof window !== 'undefined') localStorage.removeItem('queueiq_staff_token');
   };
 
   const saveBusinessQueue = (queue: any[]) => {
