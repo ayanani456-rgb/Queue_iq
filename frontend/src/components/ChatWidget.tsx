@@ -71,6 +71,8 @@ export default function ChatWidget({ isOpen: propIsOpen, onClose }: ChatWidgetPr
     setInput("");
     setIsLoading(true);
 
+    const startTime = Date.now();
+
     try {
       // Send full messages array state to /api/chat
       const response = await fetch("/api/chat", {
@@ -85,7 +87,12 @@ export default function ChatWidget({ isOpen: propIsOpen, onClose }: ChatWidgetPr
       });
 
       const data = await response.json();
-      const botReply = data.reply || "Salam! Kaise madad kar sakta hoon?";
+      const botReply = data.message || data.reply || "Salam! Kaise madad kar sakta hoon?";
+
+      const elapsed = Date.now() - startTime;
+      if (elapsed < 1000) {
+        await new Promise((resolve) => setTimeout(resolve, 1000 - elapsed));
+      }
 
       const botMessage: ChatMessage = {
         id: Date.now() + 1,

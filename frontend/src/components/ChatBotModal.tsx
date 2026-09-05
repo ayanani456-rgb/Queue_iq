@@ -155,9 +155,9 @@ export default function ChatBotModal({ isOpen, onClose }: ChatBotModalProps) {
           content: m.text,
         }));
 
-      // Call chatbot API endpoint (Next.js route or backend)
-      let replyText = "";
+      const startTime = Date.now();
       const apiEndpoint = "/api/chat";
+      let replyText = "";
 
       try {
         const response = await fetch(apiEndpoint, {
@@ -175,7 +175,7 @@ export default function ChatBotModal({ isOpen, onClose }: ChatBotModalProps) {
 
         if (response.ok) {
           const data = await response.json();
-          replyText = data.reply || "";
+          replyText = data.message || data.reply || "";
         } else {
           // Fallback to /api/chatbot/chat if /api/chat returned non-ok
           const fallbackRes = await fetch("/api/chatbot/chat", {
@@ -190,11 +190,17 @@ export default function ChatBotModal({ isOpen, onClose }: ChatBotModalProps) {
           });
           if (fallbackRes.ok) {
             const fbData = await fallbackRes.json();
-            replyText = fbData.reply || "";
+            replyText = fbData.message || fbData.reply || "";
           }
         }
       } catch (networkErr) {
         console.warn("API route attempt failed, trying fallback:", networkErr);
+      }
+
+      // Human-like typing delay of ~1 second for natural feel
+      const elapsed = Date.now() - startTime;
+      if (elapsed < 1000) {
+        await new Promise((resolve) => setTimeout(resolve, 1000 - elapsed));
       }
 
       if (!replyText) {
