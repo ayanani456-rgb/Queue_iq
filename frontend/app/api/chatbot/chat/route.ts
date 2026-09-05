@@ -84,22 +84,28 @@ Guidelines:
       const msg = userMessage.trim().toLowerCase();
       let reply = "";
 
-      if (/\b(al[-\s]?shifa|shifa)\b/i.test(msg)) {
+      if (/\b(book|booking|book\s*krdo|token\s*book|hn|haan|han|ok)\b/i.test(msg)) {
+        reply = "Dr. Ayesha Khan (ya kisi bhi doctor) ka token book karne ke liye homepage par Al-Shifa Clinic > Doctor choose karein, apna WhatsApp number enter karein aur live token instantly mil jayega!";
+      } else if (/\b(al[-\s]?shifa|shifa)\b/i.test(msg)) {
         if (/\b(ayesha|gynae|gynecolog)/i.test(msg)) {
-          reply = "Al-Shifa Clinic mein Dr. Ayesha Khan (Gynecologist) available hain. Live token Q-112! Timing: 02:00 PM - 03:00 AM.";
+          reply = "Dr. Ayesha Khan (Gynecologist) - Fee Rs. 500 - Timing 02:00 PM - 03:00 AM - Current Serving: T-127.";
         } else if (/\b(cardio|heart|rabia|salman)\b/i.test(msg)) {
-          reply = "Al-Shifa Clinic Cardiology department mein Dr. Rabia Hassan (Fee: Rs. 1800) aur Dr. Salman Iqbal available hain. Queue Q-112.";
+          reply = "Al-Shifa Clinic Cardiology department: Dr. Rabia Hassan (Serving: Q-112, Fee: Rs. 1800) aur Dr. Salman Iqbal (Serving: Q-115).";
         } else {
-          reply = "Al-Shifa Clinic mein Cardiology (Dr. Rabia), Gynecology (Dr. Ayesha), Dermatology (Dr. Zoya), Dentistry (Dr. Hina) aur General Medicine ke doctors available hain.";
+          reply = "Al-Shifa Clinic mein Dr. Ayesha Khan (Gynecology - Serving: T-127), Dr. Rabia Hassan (Cardiology - Serving: Q-112), Dr. Zoya Ahmed (Dermatology - Serving: Q-114) available hain.";
         }
+      } else if (/\b(ayesha|gynae|gynecolog)/i.test(msg)) {
+        reply = "Dr. Ayesha Khan (Gynecologist) - Fee Rs. 500 - Timing 02:00 PM - 03:00 AM - Current Serving: T-127. Kya aap token book karna chahte hain?";
+      } else if (/\b(hosp|hospital|hospitl|hosptal|clinic|clinc)\b/i.test(msg) || msg.includes('hosp')) {
+        reply = "QueueIQ par Al-Shifa Clinic registered hai. Dr. Ayesha Khan (Serving: T-127), Dr. Rabia Hassan (Serving: Q-112), Dr. Zoya Ahmed (Serving: Q-114) ke live tokens available hain.";
       } else if (/\b(nadra|nic|cnic|b[-\s]?form|frc)\b/i.test(msg)) {
         reply = "NADRA Gulberg Centre mein New NIC, Renewal, aur B-Form ke liye token N-series issue hota hai. Timing: 8:00 AM - 4:00 PM. Fee: Rs. 1000.";
       } else if (/\b(salon|hair|facial|beard|spa)\b/i.test(msg)) {
         reply = "Style Salon Gulberg mein Haircut, Facial, aur Grooming ke liye S-tokens issue hote hain. Timing: 10:00 AM - 9:00 PM.";
       } else if (/^(hi|hello|hey|salam|assalam|aoa)\b/i.test(msg)) {
-        reply = "Walaikum Assalam! Main QueueIQ AI Assistant hoon. Main aapki clinic token (Q-series), NADRA (N-series), aur salon booking (S-series) mein madad kar sakta hoon.";
+        reply = "Walaikum Assalam! Main QueueIQ AI Assistant hoon. Main aapki clinic token (Al-Shifa), NADRA (N-series), aur salon booking (S-series) mein madad kar sakta hoon.";
       } else {
-        reply = "Main QueueIQ Assistant hoon. Aap Al-Shifa Clinic, NADRA Gulberg, aur Style Salon ke tokens aur timings ke baare mein pooch sakte hain.";
+        reply = "Main QueueIQ Assistant hoon. Aap Al-Shifa Clinic (Dr. Ayesha, Dr. Rabia, Dr. Zoya), NADRA Gulberg, aur Style Salon ke tokens aur timings ke baare mein pooch sakte hain.";
       }
 
       return NextResponse.json({
