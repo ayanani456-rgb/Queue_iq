@@ -33,6 +33,9 @@ app.options('/{*splat}', cors());   // answer the browser's preflight (pre-check
 app.use(express.json());
 
 // --- Routes --------------------------------------------------------------------
+const authRoutes = require('./routes/auth.routes');
+app.use('/api/auth', authRoutes);
+
 const businessRoutes = require('./routes/business.routes');
 app.use('/api/business', businessRoutes);
 

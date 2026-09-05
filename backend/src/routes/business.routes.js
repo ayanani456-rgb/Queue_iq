@@ -8,6 +8,12 @@
 const express = require('express');
 const router = express.Router();
 const { getTokens, callNext, completeVisit, approveEmergency } = require('../controllers/business.controller');
+const auth = require('../middleware/auth');
+
+// Every staff action requires a valid JWT (obtained from POST /api/auth/login and
+// sent as `Authorization: Bearer <token>`). Applied to the whole router so no
+// business route is ever left open.
+router.use(auth);
 
 // These paths are relative — in app.js this router is mounted at "/api/business",
 // so the full URLs become /api/business/tokens, etc.

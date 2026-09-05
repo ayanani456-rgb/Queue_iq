@@ -160,6 +160,9 @@ async function sbLogin(email,pw){ const r=await fetch(SB_URL+'/rest/v1/rpc/login
 
 const $ = id => document.getElementById(id);
 const api = () => $('apiBase').value.replace(/\/$/,'');
+// Staff JWT for the protected /api/business/* endpoints (set at login).
+let AUTH_TOKEN = null;
+const bizHeaders = () => Object.assign({ 'Content-Type':'application/json' }, AUTH_TOKEN ? { Authorization:'Bearer '+AUTH_TOKEN } : {});
 function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1900); }
 function randomPhone(){ let n='03'; for(let i=0;i<9;i++) n+=Math.floor(Math.random()*10); return n; }
 function priceFor(fee){ return { normal:fee, express:fee*2, emergency:fee }; }
@@ -182,10 +185,13 @@ async function doLogin(){
   try{
     const rows = await sbLogin(email,pw);
     if(!rows.length){ $('lerr').textContent='Wrong email or password.'; return; }
-    SESSION = rows[0]; afterLogin();
+    SESSION = rows[0];
+    // Also get a backend JWT so the protected staff endpoints accept our calls.
+    try{ const br=await fetch(api()+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:pw})}); if(br.ok){ AUTH_TOKEN=(await br.json()).token; } }catch(e){}
+    afterLogin();
   }catch(e){ $('lerr').textContent='Could not reach the database.'; }
 }
-function logout(){ SESSION=null; if(S.trackTimer) clearInterval(S.trackTimer); if(S.mineTimer){clearInterval(S.mineTimer);S.mineTimer=null;} BIZ={doctors:[],doctorId:null}; showGate(); }
+function logout(){ SESSION=null; AUTH_TOKEN=null; if(S.trackTimer) clearInterval(S.trackTimer); if(S.mineTimer){clearInterval(S.mineTimer);S.mineTimer=null;} BIZ={doctors:[],doctorId:null}; showGate(); }
 function showGate(){
   const on=!!SESSION;
   $('login').style.display=on?'none':'block'; $('logoutBtn').style.display=on?'inline-block':'none';
@@ -349,15 +355,15 @@ function renderDocPick(){
 }
 function pickDoctor(id){ BIZ.doctorId=id; document.querySelectorAll('.docpick button').forEach(b=>b.classList.toggle('on',b.dataset.id===id)); loadQueue(); }
 
-async function callNext(){ try{ const r=await fetch(api()+'/api/business/call-next',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({doctorId:BIZ.doctorId})}); const d=await r.json(); toast(d.message||'Called next'); loadQueue(); }catch(e){ toast('Cannot reach backend'); } }
-async function complete(token){ try{ const r=await fetch(api()+'/api/business/complete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token})}); const d=await r.json(); toast(d.message||'Completed'); loadQueue(); }catch(e){ toast('Cannot reach backend'); } }
-async function approveEmg(token,decision){ try{ const r=await fetch(api()+'/api/business/approve-emergency',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,decision})}); const d=await r.json(); if(!r.ok){toast('Error: '+(d.error||r.status));return;} toast(d.message||decision); if(d.note) setTimeout(()=>toast(d.note),950); loadQueue(); }catch(e){ toast('Cannot reach backend'); } }
+async function callNext(){ try{ const r=await fetch(api()+'/api/business/call-next',{method:'POST',headers:bizHeaders(),body:JSON.stringify({doctorId:BIZ.doctorId})}); const d=await r.json(); toast(d.message||'Called next'); loadQueue(); }catch(e){ toast('Cannot reach backend'); } }
+async function complete(token){ try{ const r=await fetch(api()+'/api/business/complete',{method:'POST',headers:bizHeaders(),body:JSON.stringify({token})}); const d=await r.json(); toast(d.message||'Completed'); loadQueue(); }catch(e){ toast('Cannot reach backend'); } }
+async function approveEmg(token,decision){ try{ const r=await fetch(api()+'/api/business/approve-emergency',{method:'POST',headers:bizHeaders(),body:JSON.stringify({token,decision})}); const d=await r.json(); if(!r.ok){toast('Error: '+(d.error||r.status));return;} toast(d.message||decision); if(d.note) setTimeout(()=>toast(d.note),950); loadQueue(); }catch(e){ toast('Cannot reach backend'); } }
 
 async function loadQueue(){
   if(!SESSION || SESSION.role==='patient' || !BIZ.doctorId){ $('serverState').innerHTML='<span class="dot" style="background:var(--muted)"></span>—'; return; }
   const isRec = SESSION.role==='receptionist';
   try{
-    const res=await fetch(api()+'/api/business/tokens?doctorId='+encodeURIComponent(BIZ.doctorId)); const d=await res.json();
+    const res=await fetch(api()+'/api/business/tokens?doctorId='+encodeURIComponent(BIZ.doctorId),{headers:bizHeaders()}); const d=await res.json();
     $('serverState').innerHTML='<span class="dot" style="background:var(--green)"></span>backend connected';
     const s=d.summary||{}; const all=d.tokens||[];
     // action buttons row (reception only)
