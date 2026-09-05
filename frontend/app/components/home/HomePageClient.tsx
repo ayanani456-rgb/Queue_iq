@@ -269,12 +269,18 @@ export default function HomePage() {
   const bookEmergencyToken = async () => {
     setEmergencyLoading(true);
     try {
+      // Resolve the doctor the patient picked so the emergency enters THAT doctor's
+      // line on approval (per-doctor queues), not the generic no-doctor line.
+      const deptDoctors = getDoctorsForDept(bookingState?.deptId);
+      const doc = deptDoctors.find((d: any) => d.id === bookingState?.doctorId);
       const response = await fetch(`${API_URL}/api/tokens/book`, {
         method: 'POST',
         headers: await getApiHeaders(),
         body: JSON.stringify({
           phone: bookingPhone ? `${bookingPhoneCode} ${bookingPhone}` : bookingState?.phone || '',
           clientId: "00000000-0000-0000-0000-000000000123",
+          doctorId: doc?.id,
+          doctor: doc?.name,
           tokenType: 'emergency',
           emergencyType: bookingState?.emergencyType,
           description: bookingState?.emergencyDesc,
@@ -312,6 +318,11 @@ export default function HomePage() {
         user_id: "00000000-0000-0000-0000-000000000123",
         organization_id: REAL_ORG_ID,
         clientId: bookingState?.clientId || bookingState?.clinicId || clinic?.id,
+        // Send the chosen doctor so the token joins THAT doctor's line (per-doctor
+        // queues). The backend validates the UUID and falls back to the generic
+        // line if it's missing/malformed (e.g. offline mock doctor ids).
+        doctor_id: doc?.id,
+        doctor: doc?.name,
         phone: phoneStr,
         slot_time: new Date().toISOString(),
         tokenType: bookingState?.tokenType || "normal",

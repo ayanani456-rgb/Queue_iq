@@ -135,7 +135,12 @@ async function bookToken(req, res) {
 
 // Emergency path: abuse check -> AI triage -> hold PendingApproval (OUT of queue).
 async function bookEmergency(req, res) {
-  const { phone, doctor, doctorId, clientId, emergencyType, description } = req.body || {};
+  const { phone, doctor, clientId, emergencyType, description } = req.body || {};
+  // Only accept a well-formed uuid; anything else -> the generic (no-doctor) line,
+  // so a malformed id can't blow up the database insert (mirrors bookToken).
+  const rawDoctorId = req.body?.doctor_id || req.body?.doctorId;
+  const isValidUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawDoctorId || '');
+  const doctorId = isValidUuid ? rawDoctorId : null;
   try {
     if (await isEmergencySuspended(phone)) {
       return res.status(403).json({
@@ -249,13 +254,20 @@ async function getMyTokens(req, res) {
 }
 
 async function cancelBooking(req, res) {
+  const tokenId = req.params.id;
   try {
-    const booking = await findToken(req.params.id);
-    if (!booking) return res.status(404).json({ error: 'Booking not found' });
+    const found = await findToken(tokenId);
+    if (!found) return res.status(404).json({ error: 'Booking not found' });
 
-    booking.status = 'cancelled';
-    await setQueue([booking]);
-    return res.json({ message: 'Booking Cancelled', token: booking.token, status: 'cancelled' });
+    // Load the token's own doctor line and cancel it IN PLACE, then renumber so
+    // the patients behind it move up (a cancelled token no longer holds a slot).
+    // Status is 'Cancelled' to match the capitalised statuses used everywhere else.
+    const queue = await getQueue(found.doctorId);
+    const row = queue.find((r) => r.token === tokenId) || found;
+    row.status = 'Cancelled';
+    renumber(queue);
+    await setQueue(queue);
+    return res.json({ message: 'Booking Cancelled', token: row.token, status: 'Cancelled' });
   } catch (e) {
     return res.status(500).json({ error: String(e.message || e) });
   }
