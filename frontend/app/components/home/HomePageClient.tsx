@@ -873,8 +873,31 @@ export default function HomePage() {
       });
       const d = await res.json();
       showToast(d.message || 'Completed');
+      try {
+        await supabase.from('tokens').update({ status: 'Completed' }).eq('token_number', token);
+      } catch (e) { /* ignore */ }
       loadBizQueue(bizDoctorId);
     } catch (e) { showToast('Cannot reach backend'); }
+  };
+
+  const bizPause = async (token: string) => {
+    try {
+      await supabase.from('tokens').update({ status: 'Paused' }).eq('token_number', token);
+      showToast(`Token ${token} paused`);
+      loadBizQueue(bizDoctorId);
+    } catch (e) {
+      showToast('Cannot update token status');
+    }
+  };
+
+  const bizResume = async (token: string) => {
+    try {
+      await supabase.from('tokens').update({ status: 'Waiting' }).eq('token_number', token);
+      showToast(`Token ${token} resumed to Waiting`);
+      loadBizQueue(bizDoctorId);
+    } catch (e) {
+      showToast('Cannot update token status');
+    }
   };
 
   const bizApproveEmergency = async (token: string, decision: 'approve' | 'reject') => {
@@ -1909,7 +1932,14 @@ export default function HomePage() {
                       <td className="px-4 py-3 text-[#9CA3AF]">{row.phone || ''}</td>
                       {canManage ? (
                         <td className="px-4 py-3 text-right">
-                          {canComplete ? <button type="button" onClick={() => bizComplete(row.token)} className="rounded-lg border border-[#374151] px-2 py-1 text-[11px] font-medium text-white transition hover:border-[#10B981]/50">Complete</button> : null}
+                          <div className="flex items-center justify-end gap-1.5">
+                            {row.status === 'Paused' ? (
+                              <button type="button" onClick={() => bizResume(row.token)} className="rounded-lg border border-[#10B981]/40 bg-[#10B981]/10 px-2.5 py-1 text-[11px] font-bold text-[#10B981] transition hover:bg-[#10B981] hover:text-[#111827]">Resume</button>
+                            ) : (row.status === 'Serving' || row.status === 'Waiting') ? (
+                              <button type="button" onClick={() => bizPause(row.token)} className="rounded-lg border border-purple-500/40 bg-purple-500/10 px-2.5 py-1 text-[11px] font-bold text-purple-300 transition hover:bg-purple-600 hover:text-white">Pause</button>
+                            ) : null}
+                            {canComplete ? <button type="button" onClick={() => bizComplete(row.token)} className="rounded-lg border border-[#374151] px-2.5 py-1 text-[11px] font-medium text-white transition hover:border-[#10B981]/50">Complete</button> : null}
+                          </div>
                         </td>
                       ) : null}
                     </tr>
@@ -1994,13 +2024,14 @@ export default function HomePage() {
                 <a href="#about" className="text-sm text-[#9CA3AF] transition hover:text-white">About Us</a>
                 <button type="button" onClick={() => { setShowContactModal(true); setContactTab('patient'); }} className="text-sm text-[#9CA3AF] transition hover:text-white">Contact Us</button>
                 <button type="button" onClick={openMyBookings} className="text-sm text-[#9CA3AF] transition hover:text-white">My Bookings</button>
+                <a href="/doctor-dashboard" className="text-sm font-semibold text-[#10B981] hover:underline">Doctor Portal</a>
                 <button type="button" onClick={switchToBusiness} className="rounded-full border border-[#374151] bg-[#1F2937] px-4 py-2 text-sm font-medium text-white transition hover:border-[#10B981]/50 hover:text-[#10B981]">Switch to Business</button>
               </div>
               <button type="button" onClick={() => setMobileMenuOpen((prev) => !prev)} aria-label="Toggle menu" aria-expanded={mobileMenuOpen} className="inline-flex items-center justify-center rounded-lg border border-[#374151] p-2 text-white transition hover:border-[#10B981]/50 md:hidden">
                 {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
               </button>
             </nav>
-            {mobileMenuOpen ? <div className="border-t border-[#374151] bg-[#111827]/95 backdrop-blur-md md:hidden"><div className="flex flex-col gap-1 px-6 py-4"><a href="#how-it-works" className="rounded-lg px-3 py-3 text-sm text-[#9CA3AF] transition hover:bg-[#1F2937] hover:text-white">How it works</a><a href="#about" className="rounded-lg px-3 py-3 text-sm text-[#9CA3AF] transition hover:bg-[#1F2937] hover:text-white">About Us</a><button type="button" onClick={() => { setShowContactModal(true); setMobileMenuOpen(false); }} className="rounded-lg px-3 py-3 text-left text-sm text-[#9CA3AF] transition hover:bg-[#1F2937] hover:text-white">Contact Us</button><button type="button" onClick={() => { openMyBookings(); setMobileMenuOpen(false); }} className="rounded-lg px-3 py-3 text-left text-sm text-[#9CA3AF] transition hover:bg-[#1F2937] hover:text-white">My Bookings</button><div className="mt-2 border-t border-[#374151] pt-3"><button type="button" onClick={() => { switchToBusiness(); setMobileMenuOpen(false); }} className="block rounded-lg border border-[#374151] bg-[#1F2937] px-3 py-3 text-center text-sm font-medium text-white transition hover:border-[#10B981]/50 hover:text-[#10B981]">Switch to Business</button></div></div></div> : null}
+            {mobileMenuOpen ? <div className="border-t border-[#374151] bg-[#111827]/95 backdrop-blur-md md:hidden"><div className="flex flex-col gap-1 px-6 py-4"><a href="#how-it-works" className="rounded-lg px-3 py-3 text-sm text-[#9CA3AF] transition hover:bg-[#1F2937] hover:text-white">How it works</a><a href="#about" className="rounded-lg px-3 py-3 text-sm text-[#9CA3AF] transition hover:bg-[#1F2937] hover:text-white">About Us</a><button type="button" onClick={() => { setShowContactModal(true); setMobileMenuOpen(false); }} className="rounded-lg px-3 py-3 text-left text-sm text-[#9CA3AF] transition hover:bg-[#1F2937] hover:text-white">Contact Us</button><button type="button" onClick={() => { openMyBookings(); setMobileMenuOpen(false); }} className="rounded-lg px-3 py-3 text-left text-sm text-[#9CA3AF] transition hover:bg-[#1F2937] hover:text-white">My Bookings</button><a href="/doctor-dashboard" className="rounded-lg px-3 py-3 text-left text-sm font-semibold text-[#10B981] transition hover:bg-[#1F2937]">Doctor Portal</a><div className="mt-2 border-t border-[#374151] pt-3"><button type="button" onClick={() => { switchToBusiness(); setMobileMenuOpen(false); }} className="block rounded-lg border border-[#374151] bg-[#1F2937] px-3 py-3 text-center text-sm font-medium text-white transition hover:border-[#10B981]/50 hover:text-[#10B981]">Switch to Business</button></div></div></div> : null}
           </header>
 
           <div id="top">
