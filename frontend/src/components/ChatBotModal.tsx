@@ -128,24 +128,28 @@ export default function ChatBotModal({ isOpen, onClose }: ChatBotModalProps) {
       setLanguage(currentLang);
     }
 
+    const userNewMsg: ChatMessage = {
+      id: Date.now(),
+      text: msgText,
+      sender: "user",
+      time: new Date(),
+    };
+
+    const updatedMsgs = [...messages.map((m) => ({ ...m, showLanguageOptions: false })), userNewMsg];
+
+    // Log full array of messages in console - Array(N)
+    console.log("ChatBotModal sending messages array:", updatedMsgs);
+
     // Add user message
-    setMessages((prev) => [
-      ...prev.map((m) => ({ ...m, showLanguageOptions: false })),
-      {
-        id: Date.now(),
-        text: msgText,
-        sender: "user",
-        time: new Date(),
-      },
-    ]);
+    setMessages(updatedMsgs);
     setMessage("");
     setIsTyping(true);
 
     try {
       // Convert messages to history format
-      const history = messages
+      const history = updatedMsgs
         .filter((m) => !m.showLanguageOptions)
-        .slice(-8)
+        .slice(-10)
         .map((m) => ({
           role: m.sender === "user" ? "user" : "assistant",
           content: m.text,
@@ -153,7 +157,7 @@ export default function ChatBotModal({ isOpen, onClose }: ChatBotModalProps) {
 
       // Call chatbot API endpoint (Next.js route or backend)
       let replyText = "";
-      const apiEndpoint = "/api/chatbot/chat";
+      const apiEndpoint = "/api/chat";
 
       try {
         const response = await fetch(apiEndpoint, {
@@ -162,9 +166,10 @@ export default function ChatBotModal({ isOpen, onClose }: ChatBotModalProps) {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
+            messages: history,
             message: msgText,
             language: currentLang,
-            history: history,
+            history: history.slice(0, -1),
           }),
         });
 
@@ -172,14 +177,15 @@ export default function ChatBotModal({ isOpen, onClose }: ChatBotModalProps) {
           const data = await response.json();
           replyText = data.reply || "";
         } else {
-          // Fallback to /api/groq if /api/chatbot/chat returned non-ok
-          const fallbackRes = await fetch("/api/groq", {
+          // Fallback to /api/chatbot/chat if /api/chat returned non-ok
+          const fallbackRes = await fetch("/api/chatbot/chat", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
+              messages: history,
               message: msgText,
               language: currentLang,
-              history: history,
+              history: history.slice(0, -1),
             }),
           });
           if (fallbackRes.ok) {
