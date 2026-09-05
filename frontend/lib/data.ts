@@ -28,7 +28,34 @@ export const DEPARTMENTS = [
 
 export const DOCTORS_BY_DEPT: any = {
   cardio: [
-    { id: 'd1', name: 'Dr. Ayesha Khan', specialty: 'Cardiologist', experience: 12, rating: 4.9, reviews: 214, fee: 1500, bio: 'Interventional cardiologist specializing in angioplasty and heart failure management.', schedule: [{ days: ['Mon', 'Wed', 'Fri'], start: '10:00', end: '14:00' }, { days: ['Tue', 'Thu'], start: '17:00', end: '20:00' }] },
+    {
+      id: 'd1',
+      name: 'Dr. Ayesha Khan',
+      specialty: 'Gynecologist',
+      department: 'gynecology',
+      organization_id: 'alshifa-1',
+      organization_name: 'Al-Shifa Clinic',
+      available: true,
+      isAvailable: true,
+      isOnDuty: true,
+      timing: '02:00 PM - 03:00 AM', // DEMO: Shaam 2 se raat 3
+      experience: 12,
+      rating: 4.9,
+      reviews: 214,
+      fee: 500,
+      consultationFee: 500,
+      bio: 'Senior consultant specializing in clinical gynecology & women healthcare. Live Queue Demo available.',
+      schedule: [
+        { days: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], start: '14:00', end: '03:00', nextDayEnd: true, isDemo: true, isLive: true }
+      ],
+      queue: {
+        currentToken: 'Q-112',
+        totalTokens: 15,
+        waiting: 8,
+        avgTime: '10 min',
+        isLive: true
+      }
+    },
     { id: 'd2', name: 'Dr. Salman Iqbal', specialty: 'Cardiologist', experience: 8, rating: 4.6, reviews: 132, fee: 1500, bio: 'Focuses on preventive cardiology and hypertension management.', schedule: [{ days: ['Tue', 'Thu', 'Sat'], start: '11:00', end: '15:00' }] },
     { id: 'd3', name: 'Dr. Rabia Hassan', specialty: 'Cardiologist', experience: 15, rating: 4.8, reviews: 301, fee: 1800, bio: 'Senior consultant, echocardiography and arrhythmia specialist.', schedule: [{ days: ['Mon', 'Thu'], start: '09:00', end: '12:00' }] },
   ],
@@ -73,6 +100,8 @@ export const CITY_DOCTORS_BY_DEPT: any = {
     { id: 'city_d8', name: 'Dr. Asad Ullah', specialty: 'Orthopedic', experience: 15, rating: 4.8, reviews: 240, fee: 1800, bio: 'Orthopedic surgery, fractures, spine and joint pain.', schedule: [{ days: ['Tue', 'Thu', 'Sat'], start: '15:00', end: '19:00' }] },
   ],
 };
+
+export const ALSHIFA_DOCTORS_BY_DEPT = DOCTORS_BY_DEPT;
 
 // Helper to merge real Supabase doctors into mock structure
 export function mergeRealDoctors(realDoctors: any[]) {
