@@ -127,12 +127,15 @@ export default function ChatBotModal({ isOpen, onClose }: ChatBotModalProps) {
     setIsTyping(true);
 
     try {
-      // Convert messages to backend format, filtering out initial language prompts
+      // Convert messages to backend format, filtering out language selection messages
       const history = messages
+        .slice(1) // Skip initial greeting
         .filter((m) => {
           const text = m.text.toLowerCase();
-          return !text.includes("assalamualaikum") && !text.includes("perfect") && !text.includes("بہترین");
+          // Skip language selection acknowledgements
+          return !text.includes("perfect") && !text.includes("بہترین");
         })
+        .slice(0, -1) // Skip the message we just added
         .map((m) => ({
           role: m.sender === "user" ? "user" : "assistant",
           content: m.text,

@@ -12,8 +12,19 @@ async function chat(req, res) {
       return res.status(400).json({ error: "Language must be 'en' or 'ur'" });
     }
 
-    // Send message to Groq AI
-    const reply = await sendChatMessage(message, history, language);
+    // Send message to Groq AI with fallback handling
+    let reply;
+    try {
+      reply = await sendChatMessage(message, history, language);
+    } catch (error) {
+      console.error("Groq API error:", error.message);
+      // Send error message to user in their language
+      if (language === "ur") {
+        reply = "معافی چاہتا ہوں، کوئی تکنیکی خرابی پیش آئی۔ براہ کرم دوبارہ کوشش کریں۔";
+      } else {
+        reply = "Sorry, there was a technical error. Please try again.";
+      }
+    }
 
     res.json({
       reply,

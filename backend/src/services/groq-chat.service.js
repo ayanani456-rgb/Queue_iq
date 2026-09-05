@@ -201,9 +201,11 @@ async function callGroqAPISmall(messages, language = "en") {
 
 async function sendChatMessage(userMessage, chatHistory, language = "en") {
   if (!GROQ_API_KEY) {
-    throw new Error(
-      "GROQ_API_KEY not configured. Set the environment variable."
-    );
+    // Fallback response when API key is not set
+    if (language === "ur") {
+      return "معافی چاہتا ہوں، AI سروس فی الوقت دستیاب نہیں ہے۔ براہ کرم بعد میں کوشش کریں۔";
+    }
+    return "Sorry, AI service is currently unavailable. Please try again later.";
   }
 
   // Convert chat history to Groq format
@@ -226,7 +228,11 @@ async function sendChatMessage(userMessage, chatHistory, language = "en") {
     return response;
   } catch (error) {
     console.error("Groq chat error:", error);
-    throw error;
+    // Return helpful error message
+    if (language === "ur") {
+      return `معافی چاہتا ہوں، کوئی خرابی پیش آئی: ${error.message || "نامعلوم خرابی"}`;
+    }
+    return `Sorry, I encountered an error: ${error.message || "Unknown error"}`;
   }
 }
 
