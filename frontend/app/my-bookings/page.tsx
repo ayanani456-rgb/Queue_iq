@@ -4,8 +4,10 @@ import { useEffect, useState } from 'react';
 import { ArrowLeft, Calendar, Clock3, LoaderCircle, Phone, Ticket, XCircle } from 'lucide-react';
 import Link from 'next/link';
 import { CalendarActions } from '../../lib/calendar-actions';
+import { supabase } from '../../lib/supabase';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "https://queueiq-backend-production.up.railway.app";
+const DEFAULT_ORG_ID = 'bcb69e0a-b1e1-4f03-8184-1017d8e8e9eb';
 
 // Demo backend has no per-user auth yet: bookings without a real 32-char client
 // UUID are stored under this placeholder patient (see booking.controller.js), so
@@ -93,29 +95,48 @@ export default function MyBookingsPage() {
     const localList = getCombinedLocalBookings();
 
     try {
-      const response = await fetch(`${BACKEND_URL}/api/tokens/mine?clientId=${encodeURIComponent(CLIENT_ID)}`, {
-        headers: { 'Accept': 'application/json' },
-      });
-      if (response.ok) {
-        const backendData = await response.json();
-        const backendList = getBookings(backendData);
-        const seen = new Set<string>();
-        const merged: Booking[] = [];
+      const myClientId = typeof window !== 'undefined' ? (window.localStorage.getItem('client_id') || 'client_123') : 'client_123';
+      
+      const { data: supaData, error: supaError } = await supabase
+        .from('tokens')
+        .select('*')
+        .eq('client_id', myClientId)
+        .eq('organization_id', DEFAULT_ORG_ID)
+        .neq('status', 'Completed')
+        .order('created_at', { ascending: true });
 
-        for (const item of [...localList, ...backendList]) {
-          const key = String(getBookingId(item) || `${item.orgName}-${item.date}`);
-          if (!seen.has(key)) {
-            seen.add(key);
-            merged.push(item);
-          }
-        }
-        setBookings(merged);
-      } else {
-        setBookings(localList);
+      let supaBookings: Booking[] = [];
+      if (!supaError && supaData && supaData.length > 0) {
+        supaBookings = supaData.map((t: any) => ({
+          id: t.id || t.token_number,
+          token: t.token_number || t.token,
+          token_number: t.token_number,
+          organization_name: 'Al-Shifa Clinic',
+          orgName: 'Al-Shifa Clinic',
+          doctor_name: 'Dr. Ayesha',
+          clinic_name: 'Al-Shifa Clinic',
+          category: 'Healthcare',
+          status: t.status || 'Active',
+          phone: t.phone || '',
+          slot_time: t.slot_time || '02:00 PM',
+          payment_status: 'Paid',
+        }));
       }
+
+      // Merge user's Supabase tokens and local bookings
+      const seen = new Set<string>();
+      const merged: Booking[] = [];
+
+      for (const item of [...localList, ...supaBookings]) {
+        const key = String(getBookingId(item) || `${item.orgName}-${item.date}-${item.token}`);
+        if (!seen.has(key)) {
+          seen.add(key);
+          merged.push(item);
+        }
+      }
+      setBookings(merged);
     } catch (requestError) {
-      // Backend CORS/network error - silently fall back to localStorage bookings
-      console.warn('Backend unavailable, using local bookings:', requestError);
+      console.warn('Using local bookings:', requestError);
       setBookings(localList);
     } finally {
       setLoading(false);
