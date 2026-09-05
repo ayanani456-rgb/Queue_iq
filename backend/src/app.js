@@ -15,6 +15,7 @@ const app = express();
 // through the door; it does NOT authenticate anyone (that's a separate concern).
 const ALLOWED_ORIGINS = [
   'https://queueiq-frontend.vercel.app',
+  'https://queue-iq-six.vercel.app', // Production frontend
   'http://localhost:3000',
   process.env.FRONTEND_URL, // Allow custom frontend URL if set
 ].filter(Boolean);
