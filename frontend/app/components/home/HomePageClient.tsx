@@ -275,6 +275,9 @@ export default function HomePage() {
         body: JSON.stringify({
           phone: bookingPhone ? `${bookingPhoneCode} ${bookingPhone}` : bookingState?.phone || '',
           clientId: "00000000-0000-0000-0000-000000000123",
+          // Route the emergency into the chosen doctor's line (backend ignores a
+          // non-uuid id and falls back to the generic line).
+          doctor_id: bookingState?.doctorId,
           tokenType: 'emergency',
           emergencyType: bookingState?.emergencyType,
           description: bookingState?.emergencyDesc,
@@ -312,6 +315,10 @@ export default function HomePage() {
         user_id: "00000000-0000-0000-0000-000000000123",
         organization_id: REAL_ORG_ID,
         clientId: bookingState?.clientId || bookingState?.clinicId || clinic?.id,
+        // Send the chosen doctor so the booking joins THAT doctor's line, not the
+        // shared generic line (backend validates the uuid and nulls it if invalid).
+        doctor_id: doc?.id,
+        doctor: doctorName,
         phone: phoneStr,
         slot_time: new Date().toISOString(),
         tokenType: bookingState?.tokenType || "normal",

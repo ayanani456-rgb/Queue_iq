@@ -135,7 +135,13 @@ async function bookToken(req, res) {
 
 // Emergency path: abuse check -> AI triage -> hold PendingApproval (OUT of queue).
 async function bookEmergency(req, res) {
-  const { phone, doctor, doctorId, clientId, emergencyType, description } = req.body || {};
+  const { phone, doctor, clientId, emergencyType, description } = req.body || {};
+  // doctorId: accept doctor_id or doctorId, and only trust a well-formed uuid —
+  // same hardening as the normal path, so a malformed id can't blow up the insert
+  // and the emergency still lands in the CORRECT doctor's line.
+  let finalDoctorId = req.body.doctor_id || req.body.doctorId;
+  const isValidUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(finalDoctorId || '');
+  if (!isValidUuid) finalDoctorId = null;
   try {
     if (await isEmergencySuspended(phone)) {
       return res.status(403).json({
@@ -147,9 +153,9 @@ async function bookEmergency(req, res) {
     const triage = await verifyEmergency({ type: emergencyType || '', description: description || '' });
 
     const token = await nextTokenNumber();
-    const queue = await getQueue(doctorId);
+    const queue = await getQueue(finalDoctorId);
     const row = {
-      token, phone, doctor: doctor || 'Front Desk', doctorId: doctorId || null, clientId: clientId || null, time: nowLabel(),
+      token, phone, doctor: doctor || 'Front Desk', doctorId: finalDoctorId, clientId: clientId || null, time: nowLabel(),
       tokenType: 'emergency', price: req.body.price, status: 'PendingApproval', position: null,
       emergencyType: emergencyType || '', description: description || '', triage,
     };
@@ -253,9 +259,15 @@ async function cancelBooking(req, res) {
     const booking = await findToken(req.params.id);
     if (!booking) return res.status(404).json({ error: 'Booking not found' });
 
-    booking.status = 'cancelled';
-    await setQueue([booking]);
-    return res.json({ message: 'Booking Cancelled', token: booking.token, status: 'cancelled' });
+    // Cancel within the token's own doctor line, then renumber that line so the
+    // people behind close the gap (otherwise their positions stay inflated).
+    // Status is capitalized to match the rest of the app (Waiting/Serving/Done…).
+    const queue = await getQueue(booking.doctorId);
+    const row = queue.find((r) => r.token === booking.token) || booking;
+    row.status = 'Cancelled';
+    renumber(queue);
+    await setQueue(queue);
+    return res.json({ message: 'Booking Cancelled', token: row.token, status: 'Cancelled' });
   } catch (e) {
     return res.status(500).json({ error: String(e.message || e) });
   }
