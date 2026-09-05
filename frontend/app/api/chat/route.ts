@@ -32,16 +32,17 @@ export async function POST(req: NextRequest) {
 
     // Baseline live token mapping if DB query is empty
     const getDoctorInfo = (nameQuery: string, defaultName: string, defaultSpecialty: string, defaultFee: number, defaultToken: string, defaultTiming: string) => {
-      const doc = doctorsList.find((d: any) => d.name?.toLowerCase().includes(nameQuery.toLowerCase()));
+      const doc = doctorsList.find((d: any) => d.name?.toLowerCase().includes(nameQuery.toLowerCase()) && (d.organization_id === 'bcb69e0a-b1e1-4f03-8184-1017d8e8e9eb' || !d.organization_id));
       const docId = doc?.id;
       const liveServing = activeTokens.find((t: any) => t.doctor_id === docId && (t.status === 'Serving' || t.status === 'Inside'))?.token_number;
       const liveAny = activeTokens.filter((t: any) => t.doctor_id === docId && ['Serving', 'Waiting', 'Paused'].includes(t.status));
       const servingToken = liveServing || (liveAny.length > 0 ? liveAny[0].token_number : defaultToken);
 
-      const fee = doc?.fee || defaultFee;
-      const specialty = doc?.specialty || defaultSpecialty;
+      // Accurate overrides for Al-Shifa
+      const fee = nameQuery === 'ayesha' ? 500 : (doc?.fee || defaultFee);
+      const specialty = nameQuery === 'ayesha' ? 'Gynecologist' : (doc?.specialty || defaultSpecialty);
       const name = doc?.name || defaultName;
-      const timing = doc?.schedule?.when || doc?.schedule?.label || defaultTiming;
+      const timing = nameQuery === 'ayesha' ? '02:00 PM - 03:00 AM' : (doc?.schedule?.when || doc?.schedule?.label || defaultTiming);
 
       return { name, specialty, fee, servingToken, timing, docId };
     };
@@ -71,8 +72,8 @@ ORGANIZATIONS:
 • City Medical Center - General OPD & Lab tests
 
 CRITICAL RULES:
-1. Dr. Ayesha's serving token is T-127 (NOT Q-112!). Q-112 is Dr. Rabia's token.
-2. If user says "book krdo", "hn", "token book krdo" after discussing a doctor (e.g. Dr. Ayesha), DO NOT jump to NADRA! Guide them to book that doctor.
+1. Dr. Ayesha is Gynecologist (Fee: Rs. 500, Timing: 02:00 PM - 03:00 AM, Serving: T-127). Never say Cardiologist for Dr. Ayesha!
+2. If user says "jee", "le chalo", "hn", "book krdo" after discussing a doctor, guide them to book that doctor on homepage.
 3. Roman Urdu + English friendly conversation style.
       `.trim()
     };
@@ -108,6 +109,9 @@ CRITICAL RULES:
     } catch {
       // SMART CONVERSATIONAL ENGINE WITH MULTI-TURN CONTEXT TRACKING
       const msg = lastMsg.trim().toLowerCase();
+
+      // Find previous assistant message for direct dialogue continuity
+      const prevAssistantMsg = [...messages.slice(0, -1)].reverse().find((m: any) => (m.role === 'assistant' || m.sender === 'bot'))?.content?.toLowerCase() || '';
 
       // Track recent entities from conversation history (newest to oldest)
       let selectedDoctor: string | null = null;
@@ -152,12 +156,18 @@ CRITICAL RULES:
 
       let reply = "";
 
-      // 1. Check for Booking Confirmation / Affirmation (e.g. "book krdo", "hn", "haan", "ok", "token book krdo")
+      const isAffirmation = /^(jee|ji|haan|han|hn|yes|yep|yeah|chalo|le\s*chalo|le\s*jao|open\s*karo|open\s*krdo|zaroor|sure|ok|okay|theek\s*hai)$/i.test(msg) || /\b(le\s*chalo|le\s*jao|open\s*krdo|open\s*karo)\b/i.test(msg);
       const isBookingIntent = /\b(book|booking|book\s*krdo|book\s*kardo|token\s*book|token\s*chahiye|token\s*dedo|hn|haan|han|yes|ok|theek\s*hai|sahi\s*hai|kar\s*do|kr\s*do|bhej\s*do|book\s*kr\s*do|kar\s*dein|kr\s*dein)\b/i.test(msg);
       const isExplicitNadra = /\b(nadra|nic|cnic|b[-\s]?form|frc)\b/i.test(msg);
       const isExplicitSalon = /\b(salon|hair|facial|beard|spa)\b/i.test(msg);
 
-      if (isBookingIntent && !isExplicitNadra && !isExplicitSalon) {
+      // 1. Navigation / Affirmation handling ("jee", "le chalo", "haan")
+      if (isAffirmation && (prevAssistantMsg.includes('homepage par le chalun') || prevAssistantMsg.includes('homepage par'))) {
+        const docName = selectedDoctor || 'Dr. Ayesha Khan';
+        reply = `Beshak! Main aapko homepage par guide kar raha hoon. Bas 'Al-Shifa Clinic' > '${docName}' select karein, apna WhatsApp number daalein aur live token instantly book kar lein! 😊`;
+      }
+      // 2. Booking Intent (e.g. "book krdo", "token book krdo", "yes")
+      else if ((isBookingIntent || isAffirmation) && !isExplicitNadra && !isExplicitSalon) {
         if (selectedDoctor || lastContext === 'ayesha' || lastContext === 'rabia' || lastContext === 'salman' || lastContext === 'zoya' || lastContext === 'hina' || lastContext === 'alshifa' || lastContext === 'hospital') {
           const docName = selectedDoctor || (lastContext === 'rabia' ? drRabia.name : drAyesha.name);
           reply = `${docName} ka token book karne ke liye homepage par Al-Shifa Clinic > ${docName} pe click karein, apna naam aur WhatsApp number daalein, aur token instantly generate ho jayega! Kya mai aapko homepage par le chalun?`;
