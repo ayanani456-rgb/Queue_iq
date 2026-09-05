@@ -161,16 +161,88 @@ CRITICAL RULES:
       const isExplicitNadra = /\b(nadra|nic|cnic|b[-\s]?form|frc)\b/i.test(msg);
       const isExplicitSalon = /\b(salon|hair|facial|beard|spa)\b/i.test(msg);
 
-      // 1. Navigation / Affirmation handling ("jee", "le chalo", "haan")
+      // 1. Payment Questions (e.g. "or payment", "payment kaise", "jazzcash", "voucher", "fee")
+      const isPaymentQuery = /\b(payment|pay|jazzcash|easypaisa|voucher|paisa|fees|charges|online\s*pay|cash|kaise\s*pay|payment\s*method)\b/i.test(msg) || msg.includes('payment');
+      if (isPaymentQuery) {
+        const docName = selectedDoctor || (lastContext === 'rabia' ? drRabia.name : drAyesha.name);
+        const docFee = selectedDoctor === drRabia.name ? drRabia.fee : drAyesha.fee;
+        reply = `QueueIQ par payment ke 2 asaan tareeqay hain:
+
+1. 📱 Pay Online (JazzCash / EasyPaisa / Bank):
+• Booking par aapko 5-digit Voucher ID (e.g. VCH-84920) milegi.
+• JazzCash ya EasyPaisa (0300-1234567) par Voucher ID mention karke transfer karein aur token live confirm ho jayega.
+
+2. 🏥 Pay at Reception:
+• Clinic aane par reception counter par cash ya card se Rs. ${docFee} pay karein.
+
+Aapka WhatsApp number provide karein toh main ${docName} ke liye live token aur payment voucher abhi generate kar deta hoon! 😊`;
+        return NextResponse.json({ message: reply, reply });
+      }
+
+      // Check if user provided a phone number or wants instant booking in chat
+      const phoneMatch = msg.match(/03\d{9}/) || msg.match(/03\d{2}[-\s]?\d{7}/);
+      const isDirectBookRequest = (phoneMatch !== null) || (isBookingIntent && (msg.includes('krdo') || msg.includes('bana do') || msg.includes('dedo') || msg.includes('chahiye')));
+
+      if (isDirectBookRequest && (selectedDoctor || lastContext || msg.includes('ayesha') || msg.includes('rabia') || msg.includes('shifa'))) {
+        const docName = selectedDoctor || (msg.includes('rabia') ? drRabia.name : drAyesha.name);
+        const isFuture = msg.includes('kal') || msg.includes('tomorrow') || msg.includes('future') || msg.includes('agle');
+        const tokenPrefix = isFuture ? 'F' : (docName.includes('Ayesha') ? 'T' : 'Q');
+        const generatedToken = `${tokenPrefix}-${Math.floor(128 + Math.random() * 20)}`;
+        const voucherId = `VCH-${Math.floor(10000 + Math.random() * 90000)}`;
+        const appointmentDate = isFuture ? 'Tomorrow (May 14, 2026)' : 'Today (May 13, 2026)';
+        const appointmentTime = docName.includes('Ayesha') ? '03:00 PM' : '11:00 AM';
+        const docFee = docName.includes('Rabia') ? 1800 : 500;
+        const currentServing = docName.includes('Rabia') ? 'Q-112' : 'T-127';
+        const userPhone = phoneMatch ? phoneMatch[0].replace(/\s|-/g, '') : '03001234567';
+
+        const calLink = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(`Appointment: Al-Shifa Clinic (${docName})`)}&details=${encodeURIComponent(`Token: ${generatedToken} | Voucher: ${voucherId} | Fee: Rs. ${docFee} | QueueIQ`)}&location=${encodeURIComponent('Al-Shifa Clinic, Lahore')}`;
+
+        reply = `🎉 Mubarak ho! Aapka token confirm ho chuka hai:
+
+🎟️ Token Number: ${generatedToken}
+🧾 Voucher ID: ${voucherId}
+👨‍⚕️ Doctor: ${docName} (Al-Shifa Clinic)
+📅 Date: ${appointmentDate} at ${appointmentTime}
+💰 Consultation Fee: Rs. ${docFee}
+⏳ Live Queue: Current Serving ${currentServing} (Estimated wait: ~15 min)
+
+💳 Payment Options:
+1. Pay Online: JazzCash/EasyPaisa (0300-1234567) using Voucher ID ${voucherId}
+2. Pay at Reception: Show Voucher ID on arrival.
+
+📅 Add to Calendar:
+${calLink}
+
+Aapka token 'My Bookings' mein bhi save kar diya gaya hai! ✅`;
+
+        const bookingObj = {
+          token: generatedToken,
+          yourToken: generatedToken,
+          voucherId: voucherId,
+          orgName: 'Al-Shifa Clinic',
+          doctorName: docName,
+          category: 'Health',
+          date: isFuture ? '2026-05-14' : '2026-05-13',
+          time: appointmentTime,
+          phone: userPhone,
+          paymentStatus: 'Pending',
+          type: 'clinic',
+          fee: docFee
+        };
+
+        return NextResponse.json({ message: reply, reply, booking: bookingObj });
+      }
+
+      // 2. Navigation / Affirmation handling ("jee", "le chalo", "haan")
       if (isAffirmation && (prevAssistantMsg.includes('homepage par le chalun') || prevAssistantMsg.includes('homepage par'))) {
         const docName = selectedDoctor || 'Dr. Ayesha Khan';
-        reply = `Beshak! Main aapko homepage par guide kar raha hoon. Bas 'Al-Shifa Clinic' > '${docName}' select karein, apna WhatsApp number daalein aur live token instantly book kar lein! 😊`;
+        reply = `Beshak! Main aapko homepage par guide kar raha hoon. Bas 'Al-Shifa Clinic' > '${docName}' select karein, apna WhatsApp number daalein aur live token instantly book kar lein! Ya apna WhatsApp number yahan likhein toh main chat mein hi book kar dun! 😊`;
       }
-      // 2. Booking Intent (e.g. "book krdo", "token book krdo", "yes")
+      // 3. Booking Intent guidance
       else if ((isBookingIntent || isAffirmation) && !isExplicitNadra && !isExplicitSalon) {
         if (selectedDoctor || lastContext === 'ayesha' || lastContext === 'rabia' || lastContext === 'salman' || lastContext === 'zoya' || lastContext === 'hina' || lastContext === 'alshifa' || lastContext === 'hospital') {
           const docName = selectedDoctor || (lastContext === 'rabia' ? drRabia.name : drAyesha.name);
-          reply = `${docName} ka token book karne ke liye homepage par Al-Shifa Clinic > ${docName} pe click karein, apna naam aur WhatsApp number daalein, aur token instantly generate ho jayega! Kya mai aapko homepage par le chalun?`;
+          reply = `${docName} ka token book karne ke liye aap apna WhatsApp number (maslan 03001234567) yahan send karein, main direct token + payment voucher generate kar dunga! Ya homepage par jaana chahte hain?`;
         } else if (lastContext === 'nadra') {
           reply = "NADRA Gulberg mein NIC / B-Form ke liye token book karne ke liye homepage par 'NADRA Gulberg' search karein aur apna WhatsApp number enter karein. Token N-series generate ho jayega.";
         } else if (lastContext === 'salon') {
@@ -179,7 +251,7 @@ CRITICAL RULES:
           reply = "Token book karne ke liye homepage par Al-Shifa Clinic ya apni pasandeeda service choose karein, doctor select karein aur apna WhatsApp number enter karein!";
         }
       }
-      // 2. Doctor Inquiries (Dr. Ayesha, Dr. Rabia, Dr. Salman, Dr. Zoya, Dr. Hina)
+      // 4. Doctor Inquiries (Dr. Ayesha, Dr. Rabia, Dr. Salman, Dr. Zoya, Dr. Hina)
       else if (/\b(ayesha|gynae|gynecolog)/i.test(msg)) {
         reply = `${drAyesha.name} (${drAyesha.specialty}) - Fee Rs. ${drAyesha.fee} - Timing ${drAyesha.timing} - Current Serving: ${drAyesha.servingToken}. Kya aap inka token book karna chahte hain?`;
       } else if (/\b(rabia|cardio.*rabia)/i.test(msg)) {
@@ -191,41 +263,41 @@ CRITICAL RULES:
       } else if (/\b(hina|dent.*hina)/i.test(msg)) {
         reply = `${drHina.name} (${drHina.specialty}) - Fee Rs. ${drHina.fee} - Timing ${drHina.timing} - Current Serving: ${drHina.servingToken}.`;
       }
-      // 3. Al-Shifa Clinic
+      // 5. Al-Shifa Clinic
       else if (/\b(al[-\s]?shifa|shifa)\b/i.test(msg)) {
         reply = "Al-Shifa Clinic mein live doctors:\n• Dr. Ayesha Khan (Gynecologist - Serving: T-127, Fee: Rs. 500)\n• Dr. Rabia Hassan (Cardiologist - Serving: Q-112, Fee: Rs. 1800)\n• Dr. Salman Iqbal (Cardiologist - Serving: Q-115, Fee: Rs. 2000)\n• Dr. Zoya Ahmed (Dermatologist - Serving: Q-114, Fee: Rs. 1400)\n• Dr. Hina Yousuf (Dentist - Fee: Rs. 1200)\nKis doctor ka token book karna chahte hain?";
       }
-      // 4. Hospital / Clinic with Typo Handling ("hospitl", "hosptal", "hosp", "clinc")
+      // 6. Hospital / Clinic with Typo Handling ("hospitl", "hosptal", "hosp", "clinc")
       else if (/\b(hosp|hospital|hospitl|hosptal|hospitel|hostipal|clinic|clinc|clnic)\b/i.test(msg) || msg.includes('hosp')) {
         reply = "QueueIQ par Al-Shifa Clinic aur City Medical Center registered hain. Al-Shifa mein Dr. Ayesha Khan (Gynecologist), Dr. Rabia Hassan (Cardiologist), Dr. Zoya Ahmed (Dermatologist) ke live tokens available hain. Kis doctor ka appointment chahiye?";
       }
-      // 5. City Medical Center
+      // 7. City Medical Center
       else if (/\b(city[-\s]?medical|city\s*med)\b/i.test(msg)) {
         reply = "City Medical Center mein General OPD aur Diagnostic Lab tests available hain (9:00 AM - 9:00 PM). Token Q-series mein generate hota hai.";
       }
-      // 6. Generic Doctor query
+      // 8. Generic Doctor query
       else if (/\b(dr\.?|doctor|doctors)\b/i.test(msg)) {
         reply = "Al-Shifa Clinic ke available doctors:\n• Dr. Ayesha Khan (Gynecology - Serving: T-127)\n• Dr. Rabia Hassan (Cardiology - Serving: Q-112)\n• Dr. Salman Iqbal (Cardiology - Serving: Q-115)\n• Dr. Zoya Ahmed (Dermatology - Serving: Q-114)\n• Dr. Hina Yousuf (Dentistry)\nAap kiske sath checkup karwana chahte hain?";
       }
-      // 7. NADRA inquiries
+      // 9. NADRA inquiries
       else if (isExplicitNadra) {
         const randToken = "N-" + (Math.floor(Math.random() * 80) + 120);
         reply = `NADRA Gulberg Centre mein New NIC, Renewal, aur B-Form ke liye token ${randToken} issue hota hai. Timing: 8:00 AM - 4:00 PM. Zaruri documents: Original CNIC / B-Form + Photographs. Fees: Rs. 1000.`;
       }
-      // 8. Salon inquiries
+      // 10. Salon inquiries
       else if (isExplicitSalon) {
         const randToken = "S-" + (Math.floor(Math.random() * 50) + 101);
         reply = `Style Salon Gulberg mein Haircut, Beard Styling, aur Facial ke liye token ${randToken} milta hai. Timing: 10:00 AM - 9:00 PM.`;
       }
-      // 9. Fees
+      // 11. Fees
       else if (/\b(fee|fees|charges|price|paisa|cost)\b/i.test(msg)) {
         reply = `Consultation fees:\n• Dr. Ayesha Khan (Gynecology): Rs. ${drAyesha.fee}\n• Dr. Rabia Hassan (Cardiology): Rs. ${drRabia.fee}\n• Dr. Salman Iqbal (Cardiology): Rs. ${drSalman.fee}\n• Dr. Zoya Ahmed (Dermatology): Rs. ${drZoya.fee}\n• Dr. Hina Yousuf (Dentist): Rs. ${drHina.fee}\n• NADRA NIC fee: Rs. 1000`;
       }
-      // 10. Timings
+      // 12. Timings
       else if (/\b(timing|time|hours|open|kab)\b/i.test(msg)) {
         reply = `Timings:\n• Al-Shifa Clinic (Dr. Ayesha Khan): ${drAyesha.timing}\n• Al-Shifa General: 09:00 AM - 09:00 PM\n• NADRA Gulberg: 08:00 AM - 04:00 PM\n• Style Salon: 10:00 AM - 09:00 PM`;
       }
-      // 11. Greeting
+      // 13. Greeting
       else if (/^(hi|hello|hey|salam|assalam|aoa|salam\s*alaikum|assalam-o-alaikum)$/i.test(msg) || /^(hi|hello|hey|salam)\b/i.test(msg)) {
         reply = "Walaikum Assalam! QueueIQ Assistant mein khush-aamdeed. Aapko kis cheez ka live token chahiye? Hospital/Clinic (Al-Shifa), NADRA, ya Salon? 😊";
       } else {

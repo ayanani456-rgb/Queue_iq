@@ -176,6 +176,18 @@ export default function ChatBotModal({ isOpen, onClose }: ChatBotModalProps) {
         if (response.ok) {
           const data = await response.json();
           replyText = data.message || data.reply || "";
+
+          // Auto-save in-chat generated booking into localStorage
+          if (data.booking) {
+            try {
+              const saved = JSON.parse(localStorage.getItem('my_bookings') || '[]');
+              saved.unshift(data.booking);
+              localStorage.setItem('my_bookings', JSON.stringify(saved));
+              window.dispatchEvent(new Event('storage'));
+            } catch (e) {
+              console.error("Failed to save chatbot booking:", e);
+            }
+          }
         } else {
           // Fallback to /api/chatbot/chat if /api/chat returned non-ok
           const fallbackRes = await fetch("/api/chatbot/chat", {
@@ -191,6 +203,16 @@ export default function ChatBotModal({ isOpen, onClose }: ChatBotModalProps) {
           if (fallbackRes.ok) {
             const fbData = await fallbackRes.json();
             replyText = fbData.message || fbData.reply || "";
+            if (fbData.booking) {
+              try {
+                const saved = JSON.parse(localStorage.getItem('my_bookings') || '[]');
+                saved.unshift(fbData.booking);
+                localStorage.setItem('my_bookings', JSON.stringify(saved));
+                window.dispatchEvent(new Event('storage'));
+              } catch (e) {
+                console.error("Failed to save fallback booking:", e);
+              }
+            }
           }
         }
       } catch (networkErr) {
@@ -321,7 +343,32 @@ export default function ChatBotModal({ isOpen, onClose }: ChatBotModalProps) {
                     : "rounded-tl-none bg-white"
                 }`}
               >
-                <p className="break-words whitespace-pre-wrap leading-relaxed">{item.text}</p>
+                <div className="break-words whitespace-pre-wrap leading-relaxed">
+                  {item.text.split('\n').map((line, lineIdx) => {
+                    const urlMatch = line.match(/(https:\/\/[^\s]+)/);
+                    if (urlMatch) {
+                      const url = urlMatch[1];
+                      const isCalendar = url.includes('calendar.google.com');
+                      return (
+                        <div key={lineIdx} className="my-1.5">
+                          <a
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition shadow-xs ${
+                              isCalendar
+                                ? 'bg-[#10B981] text-white hover:bg-[#059669]'
+                                : 'bg-[#128C7E] text-white hover:bg-[#075E54]'
+                            }`}
+                          >
+                            📅 {isCalendar ? 'Add to Google Calendar' : 'Open Link'}
+                          </a>
+                        </div>
+                      );
+                    }
+                    return <p key={lineIdx}>{line}</p>;
+                  })}
+                </div>
                 <p className="mt-1 flex items-center justify-end gap-1 text-[10px] text-[#667781]">
                   {item.time.toLocaleTimeString([], {
                     hour: "2-digit",
