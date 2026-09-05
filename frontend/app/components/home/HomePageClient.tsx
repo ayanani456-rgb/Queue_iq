@@ -870,7 +870,7 @@ export default function HomePage() {
     if (!orgId) orgId = REAL_ORG_ID;
     try {
       const { data: depts } = await supabase.from('departments').select('id,name,icon').eq('organization_id', orgId).order('name');
-      let docQuery = supabase.from('doctors').select('id,name,department_id').eq('organization_id', orgId).order('name');
+      let docQuery = supabase.from('doctors').select('id,name,department_id,specialty,fee,experience').eq('organization_id', orgId).order('name');
       if (user?.role === 'receptionist' && user?.departmentId) docQuery = docQuery.eq('department_id', user.departmentId);
       const { data: docs } = await docQuery;
       const deptList = depts || [];
@@ -1947,13 +1947,20 @@ export default function HomePage() {
 
         {/* Real-time Doctor Queue Controller */}
         <div className="mt-8">
-          <DoctorQueue
-            doctorId={selectedDoctor?.id || currentBusiness?.doctorId || '024f24eb-a440-4079-acb3-ad8cffe85015'}
-            doctorName={selectedDoctor?.name || currentBusiness?.doctorName || 'Dr. Ayesha'}
-            specialty={selectedDoctor?.specialty || 'Gynecologist'}
-            organizationId={REAL_ORG_ID}
-            organizationName="Al-Shifa Clinic"
-          />
+          {(() => {
+            const currentDept = bizDepartments.find((d: any) => d.id === (selectedDoctor?.department_id || bizDeptId));
+            const doctorSpecialty = selectedDoctor?.specialty || selectedDoctor?.specialization || currentDept?.name || 'Cardiologist';
+            return (
+              <DoctorQueue
+                key={selectedDoctor?.id || bizDoctorId || currentBusiness?.doctorId || 'doc-queue'}
+                doctorId={selectedDoctor?.id || currentBusiness?.doctorId || '024f24eb-a440-4079-acb3-ad8cffe85015'}
+                doctorName={selectedDoctor?.name || currentBusiness?.doctorName || 'Dr. Ayesha'}
+                specialty={doctorSpecialty}
+                organizationId={REAL_ORG_ID}
+                organizationName="Al-Shifa Clinic"
+              />
+            );
+          })()}
         </div>
       </div>
     );

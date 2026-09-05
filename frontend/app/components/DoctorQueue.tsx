@@ -45,8 +45,8 @@ interface DoctorQueueProps {
 const DEFAULT_ORG_ID = 'bcb69e0a-b1e1-4f03-8184-1017d8e8e9eb';
 const DEFAULT_DOCTOR_ID = '024f24eb-a440-4079-acb3-ad8cffe85015';
 
-// Real baseline tokens as required by the system
-const DEFAULT_LIVE_TOKENS: TokenItem[] = [
+// Real baseline tokens for Dr. Ayesha Khan demo
+const AYESHA_LIVE_TOKENS: TokenItem[] = [
   {
     id: 'tok-112',
     token_number: 'Q-112',
@@ -117,11 +117,16 @@ const DEFAULT_LIVE_TOKENS: TokenItem[] = [
 export default function DoctorQueue({
   doctorId = DEFAULT_DOCTOR_ID,
   doctorName = 'Dr. Ayesha',
-  specialty = 'Gynecologist',
+  specialty = 'Cardiologist',
   organizationId = DEFAULT_ORG_ID,
   organizationName = 'Al-Shifa Clinic',
 }: DoctorQueueProps) {
-  const [tokens, setTokens] = useState<TokenItem[]>(DEFAULT_LIVE_TOKENS);
+  const isAyesha =
+    doctorId === DEFAULT_DOCTOR_ID ||
+    (doctorName && doctorName.toLowerCase().includes('ayesha')) ||
+    doctorId === 'd1';
+
+  const [tokens, setTokens] = useState<TokenItem[]>(isAyesha ? AYESHA_LIVE_TOKENS : []);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<'All' | 'Serving' | 'Waiting' | 'Paused'>('All');
   const [actionMessage, setActionMessage] = useState<string | null>(null);
@@ -132,19 +137,25 @@ export default function DoctorQueue({
     setTimeout(() => setActionMessage(null), 3000);
   };
 
-  // 1. Fetch live tokens directly from Supabase
+  // 1. Fetch live tokens directly from Supabase, filtered by doctor_id
   const fetchTokens = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('tokens')
         .select('*')
         .eq('organization_id', organizationId)
-        .in('status', ['Serving', 'Waiting', 'Paused'])
-        .order('created_at', { ascending: true });
+        .in('status', ['Serving', 'Waiting', 'Paused']);
+
+      if (doctorId) {
+        query = query.eq('doctor_id', doctorId);
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: true });
 
       if (error) {
-        console.warn('Supabase tokens query error (using baseline tokens):', error);
+        console.warn('Supabase tokens query error:', error);
+        setTokens(isAyesha ? AYESHA_LIVE_TOKENS : []);
       } else if (data && data.length > 0) {
         const mapped: TokenItem[] = data.map((t: any) => ({
           id: t.id || t.token_number,
@@ -161,22 +172,25 @@ export default function DoctorQueue({
         }));
         setTokens(mapped);
       } else {
-        setTokens(DEFAULT_LIVE_TOKENS);
+        // If DB has no tokens for this doctor:
+        // Dr. Ayesha -> AYESHA_LIVE_TOKENS
+        // Other doctors -> Empty queue []
+        setTokens(isAyesha ? AYESHA_LIVE_TOKENS : []);
       }
     } catch (err) {
       console.warn('Live token fetch fallback:', err);
-      setTokens(DEFAULT_LIVE_TOKENS);
+      setTokens(isAyesha ? AYESHA_LIVE_TOKENS : []);
     } finally {
       setLoading(false);
     }
-  }, [organizationId, doctorId, specialty]);
+  }, [organizationId, doctorId, specialty, isAyesha]);
 
   // 2. Real-time postgres channel listener
   useEffect(() => {
     fetchTokens();
 
     const channel = supabase
-      .channel('tokens-changes')
+      .channel(`tokens-changes-${doctorId || 'all'}`)
       .on(
         'postgres_changes',
         {
@@ -194,7 +208,7 @@ export default function DoctorQueue({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [fetchTokens, organizationId]);
+  }, [fetchTokens, organizationId, doctorId]);
 
   // 3. Action: Pause
   const handlePause = async (tokenNumber: string) => {
@@ -251,13 +265,13 @@ export default function DoctorQueue({
     }
   };
 
-  // 6. Action: Next
+  // 6. Action: Next (Advance current doctor's queue)
   const handleNext = async () => {
     const currentServing = tokens.find((t) => t.status === 'Serving');
     const nextWaiting = tokens.find((t) => t.status === 'Waiting');
 
     if (!nextWaiting && !currentServing) {
-      showToast('No more patients in queue');
+      showToast('No more patients in queue for this doctor');
       return;
     }
 
@@ -285,11 +299,16 @@ export default function DoctorQueue({
     }
 
     try {
-      await supabase
+      let servingUpdate = supabase
         .from('tokens')
         .update({ status: 'Completed' })
         .eq('status', 'Serving')
         .eq('organization_id', organizationId);
+
+      if (doctorId) {
+        servingUpdate = servingUpdate.eq('doctor_id', doctorId);
+      }
+      await servingUpdate;
 
       if (nextWaiting) {
         await supabase
@@ -338,7 +357,7 @@ export default function DoctorQueue({
                 </span>
               </div>
               <p className="text-sm font-medium text-slate-500">
-                {specialty} • {organizationName} • Timing: 02:00 PM - 03:00 AM
+                <span className="font-semibold text-slate-700">{specialty}</span> • {organizationName}
               </p>
             </div>
           </div>
@@ -370,9 +389,9 @@ export default function DoctorQueue({
           <div className="rounded-xl bg-emerald-50/50 p-3.5 border border-emerald-100">
             <p className="text-xs font-semibold text-emerald-800 uppercase tracking-wider">Now Serving</p>
             <p className="mt-1 font-mono text-2xl font-black text-emerald-600">
-              {servingToken ? servingToken.token_number : 'None'}
+              {servingToken ? servingToken.token_number : '--'}
             </p>
-            <p className="text-[11px] text-emerald-600/80 font-medium">Inside Room</p>
+            <p className="text-[11px] text-emerald-600/80 font-medium">Inside Consultation</p>
           </div>
 
           <div className="rounded-xl bg-amber-50/50 p-3.5 border border-amber-100">
@@ -443,8 +462,8 @@ export default function DoctorQueue({
       {filteredTokens.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-12 text-center shadow-sm">
           <Activity className="mx-auto h-10 w-10 text-slate-400 stroke-1" />
-          <p className="mt-3 text-sm font-bold text-slate-800">No tokens under filter &quot;{filter}&quot;</p>
-          <p className="mt-1 text-xs text-slate-500">All tokens in this category have been processed.</p>
+          <p className="mt-3 text-sm font-bold text-slate-800">No patients in queue for {doctorName}</p>
+          <p className="mt-1 text-xs text-slate-500">This doctor currently has no waiting or active tokens.</p>
         </div>
       ) : (
         <div className="grid gap-3.5">
