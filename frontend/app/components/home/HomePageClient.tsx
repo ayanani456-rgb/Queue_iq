@@ -1956,6 +1956,7 @@ export default function HomePage() {
                 doctorId={selectedDoctor?.id || currentBusiness?.doctorId || '024f24eb-a440-4079-acb3-ad8cffe85015'}
                 doctorName={selectedDoctor?.name || currentBusiness?.doctorName || 'Dr. Ayesha'}
                 specialty={doctorSpecialty}
+                fee={selectedDoctor?.fee || 800}
                 organizationId={REAL_ORG_ID}
                 organizationName="Al-Shifa Clinic"
               />

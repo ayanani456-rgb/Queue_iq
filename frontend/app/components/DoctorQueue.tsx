@@ -7,14 +7,11 @@ import {
   CheckCircle2,
   SkipForward,
   Clock,
-  User,
   Phone,
   RefreshCw,
-  Plus,
   Activity,
   Check,
-  Stethoscope,
-  Radio
+  Stethoscope
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
@@ -38,95 +35,131 @@ interface DoctorQueueProps {
   doctorId?: string;
   doctorName?: string;
   specialty?: string;
+  fee?: number | string;
   organizationId?: string;
   organizationName?: string;
 }
 
 const DEFAULT_ORG_ID = 'bcb69e0a-b1e1-4f03-8184-1017d8e8e9eb';
-const DEFAULT_DOCTOR_ID = '024f24eb-a440-4079-acb3-ad8cffe85015';
 
-// Real baseline tokens for Dr. Ayesha Khan demo
-const AYESHA_LIVE_TOKENS: TokenItem[] = [
-  {
-    id: 'tok-112',
-    token_number: 'Q-112',
-    status: 'Serving',
-    client_id: 'client_123',
-    patient_name: 'Patient (client_123)',
-    phone: '+92 300 1234567',
-    department: 'Gynecology',
-    doctor_id: DEFAULT_DOCTOR_ID,
-    organization_id: DEFAULT_ORG_ID,
-    created_at: new Date(Date.now() - 30 * 60000).toISOString(),
-    slot_time: '02:00 PM',
-  },
-  {
-    id: 'tok-113',
-    token_number: 'Q-113',
-    status: 'Waiting',
-    client_id: 'client_123',
-    patient_name: 'Patient (client_123)',
-    phone: '+92 321 9876543',
-    department: 'Gynecology',
-    doctor_id: DEFAULT_DOCTOR_ID,
-    organization_id: DEFAULT_ORG_ID,
-    created_at: new Date(Date.now() - 20 * 60000).toISOString(),
-    slot_time: '02:15 PM',
-  },
-  {
-    id: 'tok-115',
-    token_number: 'Q-115',
-    status: 'Waiting',
-    client_id: 'client_123',
-    patient_name: 'Patient (client_123)',
-    phone: '+92 333 4567890',
-    department: 'Gynecology',
-    doctor_id: DEFAULT_DOCTOR_ID,
-    organization_id: DEFAULT_ORG_ID,
-    created_at: new Date(Date.now() - 10 * 60000).toISOString(),
-    slot_time: '02:30 PM',
-  },
-  {
-    id: 'tok-127',
-    token_number: 'T-127',
-    status: 'Waiting',
-    client_id: 'client_456',
-    patient_name: 'Walk-in Patient',
-    phone: '+92 312 3456789',
-    department: 'Gynecology',
-    doctor_id: DEFAULT_DOCTOR_ID,
-    organization_id: DEFAULT_ORG_ID,
-    created_at: new Date(Date.now() - 5 * 60000).toISOString(),
-    slot_time: '02:45 PM',
-  },
-  {
-    id: 'tok-128',
-    token_number: 'T-128',
-    status: 'Waiting',
-    client_id: 'client_789',
-    patient_name: 'Walk-in Patient',
-    phone: '+92 345 6789012',
-    department: 'Gynecology',
-    doctor_id: DEFAULT_DOCTOR_ID,
-    organization_id: DEFAULT_ORG_ID,
-    created_at: new Date().toISOString(),
-    slot_time: '03:00 PM',
-  },
-];
+// Doctor-specific baseline queues
+const DOCTOR_BASELINE_TOKENS: Record<string, TokenItem[]> = {
+  // Dr. Rabia Hassan (Cardiologist) -> Q-112, Q-113
+  '92fc75e6-645d-4889-a856-902bb15be43d': [
+    {
+      id: 'tok-112',
+      token_number: 'Q-112',
+      status: 'Serving',
+      client_id: 'client_123',
+      patient_name: 'Sara Ahmed (client_123)',
+      phone: '+92 300 1234567',
+      department: 'Cardiologist',
+      doctor_id: '92fc75e6-645d-4889-a856-902bb15be43d',
+      organization_id: DEFAULT_ORG_ID,
+      created_at: new Date(Date.now() - 30 * 60000).toISOString(),
+      slot_time: '02:00 PM',
+    },
+    {
+      id: 'tok-113',
+      token_number: 'Q-113',
+      status: 'Waiting',
+      client_id: 'client_123',
+      patient_name: 'Zainab Bibi (client_123)',
+      phone: '+92 321 9876543',
+      department: 'Cardiologist',
+      doctor_id: '92fc75e6-645d-4889-a856-902bb15be43d',
+      organization_id: DEFAULT_ORG_ID,
+      created_at: new Date(Date.now() - 20 * 60000).toISOString(),
+      slot_time: '02:15 PM',
+    },
+  ],
+
+  // Dr. Salman Iqbal (Cardiologist) -> Q-115
+  '87c93b3f-bfe5-421e-ae3d-dfc3c3dcee19': [
+    {
+      id: 'tok-115',
+      token_number: 'Q-115',
+      status: 'Waiting',
+      client_id: 'client_123',
+      patient_name: 'Hina Tariq (client_123)',
+      phone: '+92 333 4567890',
+      department: 'Cardiologist',
+      doctor_id: '87c93b3f-bfe5-421e-ae3d-dfc3c3dcee19',
+      organization_id: DEFAULT_ORG_ID,
+      created_at: new Date(Date.now() - 10 * 60000).toISOString(),
+      slot_time: '02:30 PM',
+    },
+  ],
+
+  // Dr. Zoya Ahmed (Dermatologist) -> Q-114
+  '52f7f206-06e7-47b1-9543-54bbff196473': [
+    {
+      id: 'tok-114',
+      token_number: 'Q-114',
+      status: 'Serving',
+      client_id: 'client_123',
+      patient_name: 'Maryam Nawaz (client_123)',
+      phone: '+92 312 3456789',
+      department: 'Dermatologist',
+      doctor_id: '52f7f206-06e7-47b1-9543-54bbff196473',
+      organization_id: DEFAULT_ORG_ID,
+      created_at: new Date(Date.now() - 15 * 60000).toISOString(),
+      slot_time: '02:15 PM',
+    },
+  ],
+
+  // Dr. Ayesha Khan -> T-127, T-128
+  '024f24eb-a440-4079-acb3-ad8cffe85015': [
+    {
+      id: 'tok-127',
+      token_number: 'T-127',
+      status: 'Serving',
+      client_id: 'client_123',
+      patient_name: 'Walk-in Patient',
+      phone: '+92 345 6789012',
+      department: 'Cardiologist',
+      doctor_id: '024f24eb-a440-4079-acb3-ad8cffe85015',
+      organization_id: DEFAULT_ORG_ID,
+      created_at: new Date(Date.now() - 5 * 60000).toISOString(),
+      slot_time: '02:45 PM',
+    },
+    {
+      id: 'tok-128',
+      token_number: 'T-128',
+      status: 'Waiting',
+      client_id: 'client_123',
+      patient_name: 'Walk-in Patient',
+      phone: '+92 300 9876543',
+      department: 'Cardiologist',
+      doctor_id: '024f24eb-a440-4079-acb3-ad8cffe85015',
+      organization_id: DEFAULT_ORG_ID,
+      created_at: new Date().toISOString(),
+      slot_time: '03:00 PM',
+    },
+  ],
+};
+
+function getBaselineForDoctor(doctorId?: string, doctorName?: string): TokenItem[] {
+  if (doctorId && DOCTOR_BASELINE_TOKENS[doctorId]) {
+    return DOCTOR_BASELINE_TOKENS[doctorId];
+  }
+  const name = (doctorName || '').toLowerCase();
+  if (name.includes('rabia')) return DOCTOR_BASELINE_TOKENS['92fc75e6-645d-4889-a856-902bb15be43d'];
+  if (name.includes('salman')) return DOCTOR_BASELINE_TOKENS['87c93b3f-bfe5-421e-ae3d-dfc3c3dcee19'];
+  if (name.includes('zoya')) return DOCTOR_BASELINE_TOKENS['52f7f206-06e7-47b1-9543-54bbff196473'];
+  if (name.includes('ayesha')) return DOCTOR_BASELINE_TOKENS['024f24eb-a440-4079-acb3-ad8cffe85015'];
+  return [];
+}
 
 export default function DoctorQueue({
-  doctorId = DEFAULT_DOCTOR_ID,
-  doctorName = 'Dr. Ayesha',
+  doctorId = '92fc75e6-645d-4889-a856-902bb15be43d',
+  doctorName = 'Dr. Rabia Hassan',
   specialty = 'Cardiologist',
+  fee = 1800,
   organizationId = DEFAULT_ORG_ID,
   organizationName = 'Al-Shifa Clinic',
 }: DoctorQueueProps) {
-  const isAyesha =
-    doctorId === DEFAULT_DOCTOR_ID ||
-    (doctorName && doctorName.toLowerCase().includes('ayesha')) ||
-    doctorId === 'd1';
-
-  const [tokens, setTokens] = useState<TokenItem[]>(isAyesha ? AYESHA_LIVE_TOKENS : []);
+  const [tokens, setTokens] = useState<TokenItem[]>(() => getBaselineForDoctor(doctorId, doctorName));
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<'All' | 'Serving' | 'Waiting' | 'Paused'>('All');
   const [actionMessage, setActionMessage] = useState<string | null>(null);
@@ -137,7 +170,7 @@ export default function DoctorQueue({
     setTimeout(() => setActionMessage(null), 3000);
   };
 
-  // 1. Fetch live tokens directly from Supabase, filtered by doctor_id
+  // 1. Fetch live tokens directly from Supabase, filtered by organization_id AND doctor_id
   const fetchTokens = useCallback(async () => {
     setLoading(true);
     try {
@@ -155,7 +188,7 @@ export default function DoctorQueue({
 
       if (error) {
         console.warn('Supabase tokens query error:', error);
-        setTokens(isAyesha ? AYESHA_LIVE_TOKENS : []);
+        setTokens(getBaselineForDoctor(doctorId, doctorName));
       } else if (data && data.length > 0) {
         const mapped: TokenItem[] = data.map((t: any) => ({
           id: t.id || t.token_number,
@@ -172,18 +205,16 @@ export default function DoctorQueue({
         }));
         setTokens(mapped);
       } else {
-        // If DB has no tokens for this doctor:
-        // Dr. Ayesha -> AYESHA_LIVE_TOKENS
-        // Other doctors -> Empty queue []
-        setTokens(isAyesha ? AYESHA_LIVE_TOKENS : []);
+        // If DB has no tokens for this doctor, use doctor-specific baseline
+        setTokens(getBaselineForDoctor(doctorId, doctorName));
       }
     } catch (err) {
       console.warn('Live token fetch fallback:', err);
-      setTokens(isAyesha ? AYESHA_LIVE_TOKENS : []);
+      setTokens(getBaselineForDoctor(doctorId, doctorName));
     } finally {
       setLoading(false);
     }
-  }, [organizationId, doctorId, specialty, isAyesha]);
+  }, [organizationId, doctorId, specialty, doctorName]);
 
   // 2. Real-time postgres channel listener
   useEffect(() => {
@@ -271,7 +302,7 @@ export default function DoctorQueue({
     const nextWaiting = tokens.find((t) => t.status === 'Waiting');
 
     if (!nextWaiting && !currentServing) {
-      showToast('No more patients in queue for this doctor');
+      showToast(`No more patients in queue for ${doctorName}`);
       return;
     }
 
@@ -357,7 +388,7 @@ export default function DoctorQueue({
                 </span>
               </div>
               <p className="text-sm font-medium text-slate-500">
-                <span className="font-semibold text-slate-700">{specialty}</span> • {organizationName}
+                <span className="font-semibold text-slate-700">{specialty}</span> • {organizationName} • Rs. {fee || 800}
               </p>
             </div>
           </div>
@@ -463,7 +494,7 @@ export default function DoctorQueue({
         <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-12 text-center shadow-sm">
           <Activity className="mx-auto h-10 w-10 text-slate-400 stroke-1" />
           <p className="mt-3 text-sm font-bold text-slate-800">No patients in queue for {doctorName}</p>
-          <p className="mt-1 text-xs text-slate-500">This doctor currently has no waiting or active tokens.</p>
+          <p className="mt-1 text-xs text-slate-500">0 waiting • This doctor currently has no active tokens.</p>
         </div>
       ) : (
         <div className="grid gap-3.5">
