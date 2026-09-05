@@ -36,6 +36,7 @@ import SearchAndFilter from '@/app/components/common/SearchAndFilter';
 import ChatBotModal from '@/components/ChatBotModal';
 import { CATEGORY_MAP, CLINICS, DOCTORS_BY_DEPT, CITY_DOCTORS_BY_DEPT } from '../../../lib/data';
 import { supabase } from '../../../lib/supabase';
+import DoctorQueue from '@/app/components/DoctorQueue';
 import { CalendarActions } from '../../../lib/calendar-actions';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://queueiq-backend-production.up.railway.app";
@@ -1869,87 +1870,15 @@ export default function HomePage() {
           </div>
         ) : null}
 
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm font-semibold text-white">{selectedDoctor ? `${selectedDoctor.name}'s line` : 'Live queue'}</p>
-          <div className="flex gap-2">
-            {canManage ? <button type="button" onClick={bizCallNext} disabled={!bizDoctorId} className="rounded-lg bg-[#10B981] px-4 py-2 text-sm font-semibold text-[#111827] transition hover:bg-[#10B981]/90 disabled:cursor-not-allowed disabled:opacity-50">📢 Call Next</button> : null}
-            <button type="button" onClick={() => loadBizQueue(bizDoctorId)} className="rounded-lg border border-[#374151] px-3 py-2 text-sm font-medium text-white transition hover:border-[#10B981]/50">↻ Refresh</button>
-          </div>
-        </div>
-
-        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-xl border border-[#374151] bg-[#112240] p-5"><p className="text-xs text-[#9CA3AF]">Now Serving</p><p className="mt-1 text-2xl font-bold text-[#10B981]">{s.nowServing || '--'}</p></div>
-          <div className="rounded-xl border border-[#374151] bg-[#112240] p-5"><p className="text-xs text-[#9CA3AF]">Waiting</p><p className="mt-1 text-2xl font-bold text-white">{s.waiting ?? 0}</p></div>
-          <div className="rounded-xl border border-[#374151] bg-[#112240] p-5"><p className="text-xs text-[#9CA3AF]">Done</p><p className="mt-1 text-2xl font-bold text-white">{s.done ?? 0}</p></div>
-          <div className="rounded-xl border border-[#374151] bg-[#112240] p-5"><p className="text-xs text-[#9CA3AF]">Total</p><p className="mt-1 text-2xl font-bold text-white">{s.total ?? 0}</p></div>
-        </div>
-
-        {/* Emergency approvals — reception + owner only. */}
-        {canManage && pending.length > 0 ? (
-          <div className="mt-8">
-            <p className="mb-3 text-sm font-semibold text-[#F59E0B]">Emergencies awaiting approval ({pending.length})</p>
-            <div className="space-y-3">
-              {pending.map((r: any) => {
-                const t = r.triage || {};
-                return (
-                  <div key={r.token} className="rounded-xl border border-[#F59E0B]/30 bg-[#F59E0B]/5 p-4">
-                    <div className="flex flex-wrap items-center gap-2 text-sm text-white">
-                      <span className="font-mono font-bold">{r.token}</span>
-                      <span className="text-[#9CA3AF]">· {r.emergencyType || '—'}</span>
-                      <span className="text-[#9CA3AF]">· urgency <b className="text-white">{t.urgencyScore != null ? Math.round(t.urgencyScore * 100) + '%' : '—'}</b></span>
-                      {t.recommendation ? <span className="rounded-full border border-[#374151] px-2 py-0.5 text-[10px] text-[#9CA3AF]">{t.recommendation}</span> : null}
-                    </div>
-                    {(r.description || r.phone) ? <p className="mt-1 text-xs text-[#9CA3AF]">&quot;{r.description || ''}&quot; {r.phone ? `· ${r.phone}` : ''}</p> : null}
-                    <div className="mt-3 flex gap-2">
-                      <button type="button" onClick={() => bizApproveEmergency(r.token, 'approve')} className="rounded-lg bg-[#10B981] px-3 py-1.5 text-xs font-semibold text-[#111827] transition hover:bg-[#10B981]/90">✓ Approve</button>
-                      <button type="button" onClick={() => bizApproveEmergency(r.token, 'reject')} className="rounded-lg border border-[#EF4444] px-3 py-1.5 text-xs font-semibold text-[#EF4444] transition hover:bg-[#EF4444] hover:text-white">✕ Reject</button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ) : null}
-
+        {/* Real-time Doctor Queue Controller */}
         <div className="mt-8">
-          <p className="mb-3 text-sm font-semibold text-white">Queue</p>
-          <div className="overflow-x-auto rounded-xl border border-[#374151]">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-[#374151] bg-[#111827] text-[11px] uppercase tracking-wide text-[#9CA3AF]">
-                  <th className="px-4 py-3">Pos</th><th className="px-4 py-3">Token</th><th className="px-4 py-3">Type</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Phone</th>{canManage ? <th className="px-4 py-3 text-right">Action</th> : null}
-                </tr>
-              </thead>
-              <tbody>
-                {lineTokens.length ? lineTokens.map((row: any) => {
-                  const canComplete = row.status === 'Waiting' || row.status === 'Serving';
-                  return (
-                    <tr key={row.token} className="border-b border-[#374151] last:border-0">
-                      <td className="px-4 py-3 text-[#9CA3AF]">{row.position ?? '—'}</td>
-                      <td className="px-4 py-3 font-mono font-bold text-white">{row.token}</td>
-                      <td className="px-4 py-3"><span className="rounded-full border border-[#374151] px-2 py-0.5 text-[10px] text-[#9CA3AF]">{row.tokenType || 'normal'}</span></td>
-                      <td className="px-4 py-3"><span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-medium ${row.status === 'Serving' ? 'border-[#10B981]/30 bg-[#10B981]/10 text-[#10B981]' : row.status === 'Done' ? 'border-[#374151] bg-[#1F2937] text-[#9CA3AF]' : row.status === 'Rejected' || row.status === 'Cancelled' ? 'border-[#EF4444]/30 bg-[#EF4444]/10 text-[#EF4444]' : 'border-[#F59E0B]/30 bg-[#F59E0B]/10 text-[#F59E0B]'}`}>{row.status}</span></td>
-                      <td className="px-4 py-3 text-[#9CA3AF]">{row.phone || ''}</td>
-                      {canManage ? (
-                        <td className="px-4 py-3 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            {row.status === 'Paused' ? (
-                              <button type="button" onClick={() => bizResume(row.token)} className="rounded-lg border border-[#10B981]/40 bg-[#10B981]/10 px-2.5 py-1 text-[11px] font-bold text-[#10B981] transition hover:bg-[#10B981] hover:text-[#111827]">Resume</button>
-                            ) : (row.status === 'Serving' || row.status === 'Waiting') ? (
-                              <button type="button" onClick={() => bizPause(row.token)} className="rounded-lg border border-purple-500/40 bg-purple-500/10 px-2.5 py-1 text-[11px] font-bold text-purple-300 transition hover:bg-purple-600 hover:text-white">Pause</button>
-                            ) : null}
-                            {canComplete ? <button type="button" onClick={() => bizComplete(row.token)} className="rounded-lg border border-[#374151] px-2.5 py-1 text-[11px] font-medium text-white transition hover:border-[#10B981]/50">Complete</button> : null}
-                          </div>
-                        </td>
-                      ) : null}
-                    </tr>
-                  );
-                }) : (
-                  <tr><td colSpan={canManage ? 6 : 5} className="px-4 py-8 text-center text-[#6B7280]">This line is empty.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          <DoctorQueue
+            doctorId={selectedDoctor?.id || currentBusiness?.doctorId || '024f24eb-a440-4079-acb3-ad8cffe85015'}
+            doctorName={selectedDoctor?.name || currentBusiness?.doctorName || 'Dr. Ayesha'}
+            specialty={selectedDoctor?.specialty || 'Gynecologist'}
+            organizationId={REAL_ORG_ID}
+            organizationName="Al-Shifa Clinic"
+          />
         </div>
       </div>
     );

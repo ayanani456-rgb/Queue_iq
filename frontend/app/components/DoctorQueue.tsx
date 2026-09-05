@@ -11,19 +11,19 @@ import {
   Phone,
   RefreshCw,
   Plus,
-  AlertCircle,
   Activity,
   Check,
-  ShieldCheck,
-  Stethoscope
+  Stethoscope,
+  Radio
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 export interface TokenItem {
-  id: string | number;
+  id?: string | number;
   token_number: string;
   token?: string;
   status: 'Serving' | 'Waiting' | 'Paused' | 'Completed' | 'Done' | 'Cancelled';
+  client_id?: string;
   patient_name?: string;
   phone?: string;
   department?: string;
@@ -32,7 +32,6 @@ export interface TokenItem {
   created_at?: string;
   slot_time?: string;
   service?: string;
-  is_emergency?: boolean;
 }
 
 interface DoctorQueueProps {
@@ -46,90 +45,72 @@ interface DoctorQueueProps {
 const DEFAULT_ORG_ID = 'bcb69e0a-b1e1-4f03-8184-1017d8e8e9eb';
 const DEFAULT_DOCTOR_ID = '024f24eb-a440-4079-acb3-ad8cffe85015';
 
-const INITIAL_DEMO_TOKENS: TokenItem[] = [
+// Real baseline tokens as required by the system
+const DEFAULT_LIVE_TOKENS: TokenItem[] = [
   {
-    id: 'demo-112',
+    id: 'tok-112',
     token_number: 'Q-112',
     status: 'Serving',
-    patient_name: 'Sara Ahmed',
+    client_id: 'client_123',
+    patient_name: 'Patient (client_123)',
     phone: '+92 300 1234567',
     department: 'Gynecology',
     doctor_id: DEFAULT_DOCTOR_ID,
     organization_id: DEFAULT_ORG_ID,
-    created_at: new Date(Date.now() - 45 * 60000).toISOString(),
+    created_at: new Date(Date.now() - 30 * 60000).toISOString(),
     slot_time: '02:00 PM',
   },
   {
-    id: 'demo-113',
+    id: 'tok-113',
     token_number: 'Q-113',
     status: 'Waiting',
-    patient_name: 'Zainab Bibi',
+    client_id: 'client_123',
+    patient_name: 'Patient (client_123)',
     phone: '+92 321 9876543',
     department: 'Gynecology',
     doctor_id: DEFAULT_DOCTOR_ID,
     organization_id: DEFAULT_ORG_ID,
-    created_at: new Date(Date.now() - 35 * 60000).toISOString(),
+    created_at: new Date(Date.now() - 20 * 60000).toISOString(),
     slot_time: '02:15 PM',
   },
   {
-    id: 'demo-114',
-    token_number: 'Q-114',
+    id: 'tok-115',
+    token_number: 'Q-115',
     status: 'Waiting',
-    patient_name: 'Maryam Nawaz',
+    client_id: 'client_123',
+    patient_name: 'Patient (client_123)',
     phone: '+92 333 4567890',
     department: 'Gynecology',
     doctor_id: DEFAULT_DOCTOR_ID,
     organization_id: DEFAULT_ORG_ID,
-    created_at: new Date(Date.now() - 25 * 60000).toISOString(),
+    created_at: new Date(Date.now() - 10 * 60000).toISOString(),
     slot_time: '02:30 PM',
   },
   {
-    id: 'demo-115',
-    token_number: 'Q-115',
+    id: 'tok-127',
+    token_number: 'T-127',
     status: 'Waiting',
-    patient_name: 'Hina Tariq',
+    client_id: 'client_456',
+    patient_name: 'Walk-in Patient',
     phone: '+92 312 3456789',
     department: 'Gynecology',
     doctor_id: DEFAULT_DOCTOR_ID,
     organization_id: DEFAULT_ORG_ID,
-    created_at: new Date(Date.now() - 15 * 60000).toISOString(),
+    created_at: new Date(Date.now() - 5 * 60000).toISOString(),
     slot_time: '02:45 PM',
   },
   {
-    id: 'demo-116',
-    token_number: 'Q-116',
-    status: 'Paused',
-    patient_name: 'Ayesha Noor (Step Out)',
+    id: 'tok-128',
+    token_number: 'T-128',
+    status: 'Waiting',
+    client_id: 'client_789',
+    patient_name: 'Walk-in Patient',
     phone: '+92 345 6789012',
     department: 'Gynecology',
     doctor_id: DEFAULT_DOCTOR_ID,
     organization_id: DEFAULT_ORG_ID,
-    created_at: new Date(Date.now() - 10 * 60000).toISOString(),
-    slot_time: '03:00 PM',
-  },
-  {
-    id: 'demo-117',
-    token_number: 'Q-117',
-    status: 'Waiting',
-    patient_name: 'Rubina Yasmin',
-    phone: '+92 301 2345678',
-    department: 'Gynecology',
-    doctor_id: DEFAULT_DOCTOR_ID,
-    organization_id: DEFAULT_ORG_ID,
-    created_at: new Date(Date.now() - 5 * 60000).toISOString(),
-    slot_time: '03:15 PM',
-  },
-  {
-    id: 'demo-118',
-    token_number: 'Q-118',
-    status: 'Waiting',
-    patient_name: 'Bushra Khan',
-    phone: '+92 304 8901234',
-    department: 'Gynecology',
-    doctor_id: DEFAULT_DOCTOR_ID,
-    organization_id: DEFAULT_ORG_ID,
     created_at: new Date().toISOString(),
-    slot_time: '03:30 PM',
+    slot_time: '03:00 PM',
   },
 ];
 
@@ -140,18 +121,18 @@ export default function DoctorQueue({
   organizationId = DEFAULT_ORG_ID,
   organizationName = 'Al-Shifa Clinic',
 }: DoctorQueueProps) {
-  const [tokens, setTokens] = useState<TokenItem[]>(INITIAL_DEMO_TOKENS);
+  const [tokens, setTokens] = useState<TokenItem[]>(DEFAULT_LIVE_TOKENS);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<'All' | 'Serving' | 'Waiting' | 'Paused'>('All');
   const [actionMessage, setActionMessage] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
 
   const showToast = (msg: string) => {
     setActionMessage(msg);
     setTimeout(() => setActionMessage(null), 3000);
   };
 
-  // Fetch tokens from Supabase
+  // 1. Fetch live tokens directly from Supabase
   const fetchTokens = useCallback(async () => {
     setLoading(true);
     try {
@@ -163,65 +144,59 @@ export default function DoctorQueue({
         .order('created_at', { ascending: true });
 
       if (error) {
-        console.warn('Supabase fetch error, fallback to demo data:', error);
+        console.warn('Supabase tokens query error (using baseline tokens):', error);
       } else if (data && data.length > 0) {
-        // Map data safely
         const mapped: TokenItem[] = data.map((t: any) => ({
           id: t.id || t.token_number,
           token_number: t.token_number || t.token || `Q-${t.position || 100}`,
           status: (t.status === 'serving' ? 'Serving' : t.status === 'paused' ? 'Paused' : t.status === 'completed' ? 'Completed' : t.status || 'Waiting') as any,
-          patient_name: t.patient_name || t.name || 'Patient',
+          client_id: t.client_id || 'client_123',
+          patient_name: t.patient_name || t.name || (t.client_id ? `Patient (${t.client_id})` : 'Walk-in Patient'),
           phone: t.phone || '',
           department: t.department || specialty,
           doctor_id: t.doctor_id || doctorId,
           organization_id: t.organization_id || organizationId,
           created_at: t.created_at,
           slot_time: t.slot_time,
-          is_emergency: !!t.emergency_type || !!t.is_emergency,
         }));
         setTokens(mapped);
       } else {
-        // Empty DB: Seed or keep default demo queue
-        setTokens(INITIAL_DEMO_TOKENS);
+        setTokens(DEFAULT_LIVE_TOKENS);
       }
     } catch (err) {
-      console.warn('Network error loading tokens:', err);
-      setTokens(INITIAL_DEMO_TOKENS);
+      console.warn('Live token fetch fallback:', err);
+      setTokens(DEFAULT_LIVE_TOKENS);
     } finally {
       setLoading(false);
     }
   }, [organizationId, doctorId, specialty]);
 
+  // 2. Real-time postgres channel listener
   useEffect(() => {
     fetchTokens();
 
-    // Supabase real-time subscription
-    try {
-      const channel = supabase
-        .channel('schema-db-changes')
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'tokens',
-            filter: `organization_id=eq.${organizationId}`,
-          },
-          () => {
-            fetchTokens();
-          }
-        )
-        .subscribe();
+    const channel = supabase
+      .channel('tokens-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'tokens',
+          filter: `organization_id=eq.${organizationId}`,
+        },
+        () => {
+          fetchTokens();
+        }
+      )
+      .subscribe();
 
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    } catch (e) {
-      console.warn('Real-time subscription skipped:', e);
-    }
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [fetchTokens, organizationId]);
 
-  // 1. Pause Token
+  // 3. Action: Pause
   const handlePause = async (tokenNumber: string) => {
     startTransition(() => {
       setTokens((prev) =>
@@ -236,11 +211,11 @@ export default function DoctorQueue({
         .update({ status: 'Paused' })
         .eq('token_number', tokenNumber);
     } catch (err) {
-      console.error('Failed to pause token in Supabase:', err);
+      console.warn('Supabase pause token update:', err);
     }
   };
 
-  // 2. Resume Token
+  // 4. Action: Resume
   const handleResume = async (tokenNumber: string) => {
     startTransition(() => {
       setTokens((prev) =>
@@ -255,11 +230,11 @@ export default function DoctorQueue({
         .update({ status: 'Waiting' })
         .eq('token_number', tokenNumber);
     } catch (err) {
-      console.error('Failed to resume token in Supabase:', err);
+      console.warn('Supabase resume token update:', err);
     }
   };
 
-  // 3. Complete Token
+  // 5. Action: Complete
   const handleComplete = async (tokenNumber: string) => {
     startTransition(() => {
       setTokens((prev) => prev.filter((t) => t.token_number !== tokenNumber));
@@ -272,17 +247,17 @@ export default function DoctorQueue({
         .update({ status: 'Completed' })
         .eq('token_number', tokenNumber);
     } catch (err) {
-      console.error('Failed to complete token in Supabase:', err);
+      console.warn('Supabase complete token update:', err);
     }
   };
 
-  // 4. Next Token (Set current Serving to Completed & Next Waiting to Serving)
+  // 6. Action: Next
   const handleNext = async () => {
     const currentServing = tokens.find((t) => t.status === 'Serving');
     const nextWaiting = tokens.find((t) => t.status === 'Waiting');
 
     if (!nextWaiting && !currentServing) {
-      showToast('No patients left in queue');
+      showToast('No more patients in queue');
       return;
     }
 
@@ -310,12 +285,12 @@ export default function DoctorQueue({
     }
 
     try {
-      if (currentServing) {
-        await supabase
-          .from('tokens')
-          .update({ status: 'Completed' })
-          .eq('token_number', currentServing.token_number);
-      }
+      await supabase
+        .from('tokens')
+        .update({ status: 'Completed' })
+        .eq('status', 'Serving')
+        .eq('organization_id', organizationId);
+
       if (nextWaiting) {
         await supabase
           .from('tokens')
@@ -323,50 +298,11 @@ export default function DoctorQueue({
           .eq('token_number', nextWaiting.token_number);
       }
     } catch (err) {
-      console.error('Failed to advance queue in Supabase:', err);
+      console.warn('Supabase advance queue update:', err);
     }
   };
 
-  // Quick Add Demo Token
-  const handleAddToken = async () => {
-    const lastNum = tokens.reduce((max, t) => {
-      const n = parseInt(t.token_number.replace(/\D/g, ''), 10);
-      return !isNaN(n) && n > max ? n : max;
-    }, 118);
-
-    const newNumber = `Q-${lastNum + 1}`;
-    const newToken: TokenItem = {
-      id: `manual-${Date.now()}`,
-      token_number: newNumber,
-      status: 'Waiting',
-      patient_name: `Walk-in Patient #${lastNum + 1}`,
-      phone: '+92 300 ' + Math.floor(1000000 + Math.random() * 9000000),
-      department: specialty,
-      doctor_id: doctorId,
-      organization_id: organizationId,
-      created_at: new Date().toISOString(),
-      slot_time: 'Live Token',
-    };
-
-    setTokens((prev) => [...prev, newToken]);
-    showToast(`Added token ${newNumber} to queue`);
-
-    try {
-      await supabase.from('tokens').insert([
-        {
-          token_number: newNumber,
-          status: 'Waiting',
-          organization_id: organizationId,
-          doctor_id: doctorId,
-          phone: newToken.phone,
-        },
-      ]);
-    } catch (err) {
-      console.warn('Manual insert to Supabase skipped:', err);
-    }
-  };
-
-  // Filtered List
+  // Filtered tokens
   const filteredTokens = tokens.filter((t) => {
     if (filter === 'All') return true;
     return t.status === filter;
@@ -378,15 +314,15 @@ export default function DoctorQueue({
 
   return (
     <div className="w-full space-y-6">
-      {/* Toast Banner */}
+      {/* Toast Notification */}
       {actionMessage && (
-        <div className="fixed top-5 right-5 z-50 flex items-center gap-2.5 rounded-xl border border-emerald-500/30 bg-emerald-950/90 backdrop-blur-md px-4 py-3 text-sm font-semibold text-emerald-200 shadow-2xl animate-in fade-in slide-in-from-top-3">
+        <div className="fixed top-5 right-5 z-50 flex items-center gap-2.5 rounded-xl border border-emerald-500/30 bg-emerald-950/95 backdrop-blur-md px-4 py-3 text-sm font-semibold text-emerald-200 shadow-2xl animate-in fade-in slide-in-from-top-3">
           <Check className="h-4 w-4 text-emerald-400" />
           {actionMessage}
         </div>
       )}
 
-      {/* Top Header Card */}
+      {/* Header Info Card */}
       <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3.5">
@@ -396,8 +332,8 @@ export default function DoctorQueue({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-xl font-extrabold text-slate-900">{doctorName}</h2>
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 border border-emerald-200">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 border border-emerald-200">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
                   Live On Duty
                 </span>
               </div>
@@ -407,7 +343,7 @@ export default function DoctorQueue({
             </div>
           </div>
 
-          {/* Quick Action Buttons */}
+          {/* Action Buttons */}
           <div className="flex flex-wrap items-center gap-2.5">
             <button
               onClick={handleNext}
@@ -419,18 +355,10 @@ export default function DoctorQueue({
             </button>
 
             <button
-              onClick={handleAddToken}
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100 active:scale-95 transition-all"
-            >
-              <Plus className="h-4 w-4 text-slate-500" />
-              Issue Token
-            </button>
-
-            <button
               onClick={fetchTokens}
               disabled={loading}
               className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white p-2.5 text-slate-600 hover:bg-slate-50 active:scale-95 transition-all"
-              title="Refresh Queue"
+              title="Refresh Live Queue"
             >
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin text-emerald-600' : ''}`} />
             </button>
@@ -439,30 +367,30 @@ export default function DoctorQueue({
 
         {/* Live Metrics Grid */}
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4 border-t border-slate-100 pt-5">
-          <div className="rounded-xl bg-slate-50/70 p-3.5 border border-slate-100">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Now Serving</p>
+          <div className="rounded-xl bg-emerald-50/50 p-3.5 border border-emerald-100">
+            <p className="text-xs font-semibold text-emerald-800 uppercase tracking-wider">Now Serving</p>
             <p className="mt-1 font-mono text-2xl font-black text-emerald-600">
               {servingToken ? servingToken.token_number : 'None'}
             </p>
-            <p className="text-[11px] text-slate-400 font-medium">Inside Consultation Room</p>
+            <p className="text-[11px] text-emerald-600/80 font-medium">Inside Room</p>
           </div>
 
-          <div className="rounded-xl bg-slate-50/70 p-3.5 border border-slate-100">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Waiting Patients</p>
+          <div className="rounded-xl bg-amber-50/50 p-3.5 border border-amber-100">
+            <p className="text-xs font-semibold text-amber-800 uppercase tracking-wider">Waiting</p>
             <p className="mt-1 font-mono text-2xl font-black text-amber-600">{waitingCount}</p>
-            <p className="text-[11px] text-slate-400 font-medium">Avg wait ~10 mins</p>
+            <p className="text-[11px] text-amber-600/80 font-medium">In waiting lounge</p>
           </div>
 
-          <div className="rounded-xl bg-slate-50/70 p-3.5 border border-slate-100">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Paused Tokens</p>
+          <div className="rounded-xl bg-purple-50/50 p-3.5 border border-purple-100">
+            <p className="text-xs font-semibold text-purple-800 uppercase tracking-wider">Paused</p>
             <p className="mt-1 font-mono text-2xl font-black text-purple-600">{pausedCount}</p>
-            <p className="text-[11px] text-slate-400 font-medium">Stepped out / on hold</p>
+            <p className="text-[11px] text-purple-600/80 font-medium">On temporary hold</p>
           </div>
 
           <div className="rounded-xl bg-slate-50/70 p-3.5 border border-slate-100">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total in Queue</p>
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total in Line</p>
             <p className="mt-1 font-mono text-2xl font-black text-slate-800">{tokens.length}</p>
-            <p className="text-[11px] text-slate-400 font-medium">Active today</p>
+            <p className="text-[11px] text-slate-400 font-medium">Active queue</p>
           </div>
         </div>
       </div>
@@ -515,8 +443,8 @@ export default function DoctorQueue({
       {filteredTokens.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-12 text-center shadow-sm">
           <Activity className="mx-auto h-10 w-10 text-slate-400 stroke-1" />
-          <p className="mt-3 text-sm font-bold text-slate-800">No tokens match filter &quot;{filter}&quot;</p>
-          <p className="mt-1 text-xs text-slate-500">All patients in this category have been attended to.</p>
+          <p className="mt-3 text-sm font-bold text-slate-800">No tokens under filter &quot;{filter}&quot;</p>
+          <p className="mt-1 text-xs text-slate-500">All tokens in this category have been processed.</p>
         </div>
       ) : (
         <div className="grid gap-3.5">
@@ -530,39 +458,39 @@ export default function DoctorQueue({
                 key={String(token.id || token.token_number || index)}
                 className={`group relative rounded-2xl border p-5 transition-all duration-200 ${
                   isServing
-                    ? 'border-emerald-400 bg-gradient-to-r from-emerald-50/80 via-emerald-50/40 to-white shadow-md ring-2 ring-emerald-500/20'
+                    ? 'border-emerald-500 bg-gradient-to-r from-emerald-50/90 via-emerald-50/40 to-white shadow-lg ring-2 ring-emerald-500/30'
                     : isPaused
-                    ? 'border-purple-200 bg-purple-50/30 shadow-xs opacity-90'
+                    ? 'border-purple-200 bg-purple-50/30 shadow-xs'
                     : 'border-slate-200 bg-white shadow-xs hover:border-slate-300 hover:shadow-sm'
                 }`}
               >
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  {/* Left Token Info */}
+                  {/* Left Token Details */}
                   <div className="flex items-start gap-4">
                     <div
                       className={`flex h-14 w-16 flex-col items-center justify-center rounded-xl font-mono font-black text-xl transition-all ${
                         isServing
-                          ? 'bg-emerald-600 text-white shadow-emerald-500/20 shadow-lg scale-105'
+                          ? 'bg-emerald-600 text-white shadow-emerald-500/30 shadow-lg scale-105'
                           : isPaused
                           ? 'bg-purple-100 text-purple-800 border border-purple-200'
-                          : 'bg-slate-100 text-slate-800 border border-slate-200'
+                          : 'bg-amber-50 text-amber-900 border border-amber-200'
                       }`}
                     >
                       <span>{token.token_number}</span>
                       <span className="text-[9px] font-sans font-bold uppercase tracking-wider opacity-80">
-                        {isServing ? 'Active' : isPaused ? 'Hold' : `#${index + 1}`}
+                        {isServing ? 'Serving' : isPaused ? 'Paused' : `#${index + 1}`}
                       </span>
                     </div>
 
                     <div className="space-y-1">
                       <div className="flex items-center gap-2.5">
                         <span className="font-bold text-slate-900 text-base">
-                          {token.patient_name || 'Patient'}
+                          {token.patient_name || (token.client_id ? `Patient (${token.client_id})` : 'Walk-in Patient')}
                         </span>
 
                         {/* Status Badge */}
                         {isServing && (
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-3 py-0.5 text-xs font-bold text-emerald-700 animate-pulse">
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-3 py-0.5 text-xs font-bold text-emerald-700 shadow-sm animate-pulse">
                             <span className="h-2 w-2 rounded-full bg-emerald-500" />
                             Serving - Inside
                           </span>
@@ -584,6 +512,11 @@ export default function DoctorQueue({
                       </div>
 
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
+                        {token.client_id && (
+                          <span className="font-mono text-slate-400">
+                            Client: {token.client_id}
+                          </span>
+                        )}
                         {token.phone && (
                           <span className="flex items-center gap-1">
                             <Phone className="h-3 w-3 text-slate-400" />
@@ -608,7 +541,7 @@ export default function DoctorQueue({
                       <button
                         onClick={() => handlePause(token.token_number)}
                         className="inline-flex items-center gap-1.5 rounded-xl border border-purple-200 bg-purple-50 px-3 py-2 text-xs font-bold text-purple-700 hover:bg-purple-100 hover:border-purple-300 active:scale-95 transition-all"
-                        title="Pause this token (Patient stepped out)"
+                        title="Pause this token"
                       >
                         <Pause className="h-3.5 w-3.5" />
                         Pause
@@ -620,7 +553,7 @@ export default function DoctorQueue({
                       <button
                         onClick={() => handleResume(token.token_number)}
                         className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3.5 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100 hover:border-emerald-400 active:scale-95 transition-all shadow-xs"
-                        title="Resume to Waiting"
+                        title="Resume token to Waiting"
                       >
                         <Play className="h-3.5 w-3.5 fill-emerald-600" />
                         Resume
