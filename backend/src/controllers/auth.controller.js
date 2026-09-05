@@ -25,9 +25,11 @@ if (useSupabase) {
 // Offline/in-memory demo staff (mirrors the frontend demo accounts). Only used
 // when Supabase isn't configured — production always goes through the rpc above.
 const DEMO_STAFF = {
-  'admin@alshifa.com': { password: '123456', role: 'owner' },
-  'reception@alshifa.com': { password: '123456', role: 'receptionist' },
-  'dr.ayesha@alshifa.com': { password: '123456', role: 'doctor', doctorId: 'd1', doctorName: 'Dr. Ayesha Khan' },
+  'admin@alshifa.com': { password: '123456', role: 'owner', orgId: 'bcb69e0a-b1e1-4f03-8184-1017d8e8e9eb', displayName: 'System Admin' },
+  'owner@alshifa.com': { password: '123456', role: 'owner', orgId: 'bcb69e0a-b1e1-4f03-8184-1017d8e8e9eb', displayName: 'Al-Shifa Owner' },
+  'reception@alshifa.com': { password: '123456', role: 'receptionist', orgId: 'bcb69e0a-b1e1-4f03-8184-1017d8e8e9eb' },
+  'reception.cardio@alshifa.com': { password: '123456', role: 'receptionist', orgId: 'bcb69e0a-b1e1-4f03-8184-1017d8e8e9eb' },
+  'dr.ayesha@alshifa.com': { password: '123456', role: 'doctor', doctorId: '024f24eb-a440-4079-acb3-ad8cffe85015', doctorName: 'Dr. Ayesha', orgId: 'bcb69e0a-b1e1-4f03-8184-1017d8e8e9eb' },
 };
 
 // Map a raw account row (from the login() rpc) to the identity the dashboard needs.
