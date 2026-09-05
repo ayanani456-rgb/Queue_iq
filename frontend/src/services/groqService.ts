@@ -14,7 +14,8 @@ export const groqService = {
   async sendMessage(
     userMessage: string,
     chatHistory: ChatHistory,
-    userLocation: { lat: number; lng: number } | null = null
+    language: "en" | "ur" = "en",
+    hospitalsData: any[] = []
   ): Promise<string> {
     try {
       const response = await fetch("/api/groq", {
@@ -24,10 +25,9 @@ export const groqService = {
         },
         body: JSON.stringify({
           message: userMessage,
-          language: "en",
+          language,
           history: chatHistory.slice(-8),
-          userLocation,
-          hospitalsData: [],
+          hospitalsData,
         }),
       });
 
@@ -39,7 +39,9 @@ export const groqService = {
       const data = await response.json();
       return (
         data.reply ||
-        "Sorry, I couldn't generate a response. Please try again."
+        (language === "ur"
+          ? "معافی چاہتا ہوں، کوئی جواب نہیں مل سکا۔ دوبارہ کوشش کریں۔"
+          : "Sorry, I couldn't generate a response. Please try again.")
       );
     } catch (error) {
       console.error("Groq service error:", error);

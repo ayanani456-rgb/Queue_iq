@@ -4,6 +4,22 @@ import { FormEvent, useState, useEffect, useRef } from "react";
 import { CheckCheck, Mic, Paperclip, Send, Smile, X } from "lucide-react";
 import { groqService, ChatHistory } from "@/services/groqService";
 
+const hospitalsData = [
+  {
+    name: "Ziauddin Hospital North Nazimabad",
+    doctors: [
+      { name: "Dr. Ayesha Khan", speciality: "Dermatology", fee: 1500, currentToken: "T-115", yourToken: "T-118", wait: "16 min", available: "Kal 10AM-2PM" },
+      { name: "Dr. Saleem Iqbal", speciality: "Cardiology", fee: 2000, currentToken: "T-42", yourToken: "T-45", wait: "32 min", available: "Aaj 9AM-5PM" },
+    ],
+  },
+  {
+    name: "Mamji Hospital",
+    doctors: [
+      { name: "Dr. Fatima Noor", speciality: "General", fee: 1000, currentToken: "T-28", yourToken: "T-31", wait: "20 min", available: "Aaj 4PM-8PM" },
+    ],
+  },
+];
+
 type ChatMessage = {
   id: string | number;
   text: string;
@@ -20,7 +36,7 @@ export default function ChatBotModal({ isOpen, onClose }: ChatBotModalProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 1,
-      text: "Assalamualaikum! 👋 I'm your QueueIQ AI Assistant. How can I help you book an appointment or check queue status today?",
+      text: "Assalamualaikum! 🙏 Aap kis zuban mein baat karna pasand karenge?\n\nEnglish ya Urdu? / انگریزی یا اردو؟\n\nReply: ENGLISH or URDU",
       sender: "bot",
       time: new Date(),
     },
@@ -29,6 +45,7 @@ export default function ChatBotModal({ isOpen, onClose }: ChatBotModalProps) {
   const [isTyping, setIsTyping] = useState(false);
   const [chatHistory, setChatHistory] = useState<ChatHistory>([]);
   const [error, setError] = useState<string | null>(null);
+  const [language, setLanguage] = useState<"en" | "ur" | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -64,6 +81,56 @@ export default function ChatBotModal({ isOpen, onClose }: ChatBotModalProps) {
 
     setError(null);
 
+    const lower = msgText.toLowerCase().trim();
+
+    // Language selection
+    if (lower === "english" || lower === "en") {
+      setLanguage("en");
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now(),
+          text: msgText,
+          sender: "user",
+          time: new Date(),
+        },
+        {
+          id: Date.now() + 1,
+          text: "Perfect! 🎯 How can I help you with your appointment or token today?",
+          sender: "bot",
+          time: new Date(),
+        },
+      ]);
+      setMessage("");
+      return;
+    }
+
+    if (lower === "urdu" || lower === "ur") {
+      setLanguage("ur");
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now(),
+          text: msgText,
+          sender: "user",
+          time: new Date(),
+        },
+        {
+          id: Date.now() + 1,
+          text: "بہترین! 🎯 میں آپ کے اپوائنٹمنٹ یا ٹوکن میں کیسے مدد کر سکتا ہوں؟",
+          sender: "bot",
+          time: new Date(),
+        },
+      ]);
+      setMessage("");
+      return;
+    }
+
+    if (!language) {
+      setError("پہلے زبان منتخب کریں / Please select a language first");
+      return;
+    }
+
     // Add user message
     const userMsg: ChatMessage = {
       id: Date.now(),
@@ -83,8 +150,13 @@ export default function ChatBotModal({ isOpen, onClose }: ChatBotModalProps) {
         { role: "user", content: msgText },
       ];
 
-      // Get bot response
-      const reply = await groqService.sendMessage(msgText, newHistory);
+      // Get bot response with Groq
+      const reply = await groqService.sendMessage(
+        msgText,
+        newHistory,
+        language === "ur" ? "ur" : "en",
+        hospitalsData
+      );
 
       // Add bot response
       const botMsg: ChatMessage = {
@@ -104,7 +176,9 @@ export default function ChatBotModal({ isOpen, onClose }: ChatBotModalProps) {
       );
       const errorMsg: ChatMessage = {
         id: Date.now() + 1,
-        text: "Sorry, I encountered an error. Please try again.",
+        text: language === "ur" 
+          ? "معافی چاہتا ہوں، کوئی خرابی پیش آئی۔ دوبارہ کوشش کریں۔"
+          : "Sorry, I encountered an error. Please try again.",
         sender: "bot",
         time: new Date(),
       };
@@ -230,7 +304,7 @@ export default function ChatBotModal({ isOpen, onClose }: ChatBotModalProps) {
             type="text"
             value={message}
             onChange={(event) => setMessage(event.target.value)}
-            placeholder="Type a message..."
+            placeholder={language ? "Type a message..." : "Select language..."}
             aria-label="Message"
             className="min-w-0 flex-1 rounded-full border border-transparent bg-white px-4 py-2.5 text-sm text-[#303030] outline-none placeholder:text-[#667781] focus:border-[#25D366]"
             disabled={isTyping}
