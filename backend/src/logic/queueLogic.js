@@ -14,12 +14,13 @@ const isActive = (row) => ACTIVE.includes(row.status);
 // then jumps the rest of the normals.
 const EXPRESS_KEEP_AHEAD = 3;
 
-// Re-number positions by array order. PendingApproval / Rejected rows are NOT in
-// the visible line, so they get position null (they don't occupy a queue slot).
+// Re-number positions by array order. PendingApproval / Rejected / Cancelled rows
+// are NOT in the visible line, so they get position null (no queue slot).
+const OUT_OF_LINE = ['PendingApproval', 'Rejected', 'Cancelled'];
 function renumber(queue) {
   let pos = 0;
   queue.forEach((row) => {
-    if (row.status === 'PendingApproval' || row.status === 'Rejected') {
+    if (OUT_OF_LINE.includes(row.status)) {
       row.position = null;
     } else {
       pos += 1;

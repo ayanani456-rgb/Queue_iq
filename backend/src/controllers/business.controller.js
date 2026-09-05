@@ -43,15 +43,6 @@ async function callNext(req, res) {
     const current = queue.find((row) => row.status === 'Serving');
     if (current) current.status = 'Done';
 
-    const upcoming = queue
-      .filter((row) => String(row.status).toLowerCase() === 'waiting')
-      .sort((first, second) => {
-        const firstCreated = new Date(first.createdAt || first.created_at || 0).getTime();
-        const secondCreated = new Date(second.createdAt || second.created_at || 0).getTime();
-        return firstCreated - secondCreated;
-      })
-      .slice(0, 3);
-
     const next = queue.find((row) => row.status === 'Waiting');
     if (!next) {
       await setQueue(queue);
@@ -63,11 +54,14 @@ async function callNext(req, res) {
     next.status = 'Serving';
     await setQueue(queue);
 
+    // Notify the next few patients still waiting. The queue is already returned in
+    // line order (queue_position), so the first Waiting rows ARE the next in line.
+    const upcoming = queue.filter((row) => row.status === 'Waiting').slice(0, 3);
     for (const [index, booking] of upcoming.entries()) {
       try {
         await sendWhatsApp(
-          booking.user?.phone || booking.phone,
-          `Get ready! Your turn is in ${index + 1} - Token ${booking.tokenNumber || booking.token}`,
+          booking.phone,
+          `Get ready! You are #${index + 1} in line - Token ${booking.token}`,
         );
       } catch (error) {
         console.error('WhatsApp notification failed', error);
