@@ -33,7 +33,7 @@ import { SALONS_DATA } from '@/app/data/salons';
 import { categories } from '@/app/data/categories';
 import UniversalCard from '@/app/components/common/UniversalCard';
 import SearchAndFilter from '@/app/components/common/SearchAndFilter';
-import { BUSINESS_ACCOUNTS, CATEGORY_MAP, CLINICS, DEPARTMENTS, DOCTORS_BY_DEPT } from '../../../lib/data';
+import { CATEGORY_MAP, CLINICS, DOCTORS_BY_DEPT } from '../../../lib/data';
 import { supabase } from '../../../lib/supabase';
 import { CalendarActions } from '../../../lib/calendar-actions';
 
@@ -209,8 +209,14 @@ export default function HomePage() {
   const [showPassword, setShowPassword] = useState(false);
   const [bizError, setBizError] = useState('');
   const [currentBusiness, setCurrentBusiness] = useState<any>(null);
-  const [businessQueue, setBusinessQueue] = useState<any[]>([]);
-  const [businessDoctors, setBusinessDoctors] = useState<any[]>([]);
+  // Role-based dashboard, driven live by the backend (per-doctor queues).
+  const [bizDepartments, setBizDepartments] = useState<any[]>([]);
+  const [bizDoctors, setBizDoctors] = useState<any[]>([]);
+  const [bizDeptId, setBizDeptId] = useState<string | null>(null);
+  const [bizDoctorId, setBizDoctorId] = useState<string | null>(null);
+  const [bizQueue, setBizQueue] = useState<{ summary: any; tokens: any[] }>({ summary: {}, tokens: [] });
+  const [bizConn, setBizConn] = useState(false);
+  const [bizErr, setBizErr] = useState('');
   const [tokenSlotsUsed, setTokenSlotsUsed] = useState({ emergency: 2, express: 9 });
   const [myBookings, setMyBookings] = useState<any[]>([]);
   const [bookingPhone, setBookingPhone] = useState('');
@@ -541,23 +547,27 @@ export default function HomePage() {
     if (typeof window === 'undefined') return;
     const saved = localStorage.getItem('queueiq_my_bookings');
     if (saved) setMyBookings(JSON.parse(saved));
-    const queue = localStorage.getItem('queueiq_queue_SHIF');
-    if (queue) setBusinessQueue(JSON.parse(queue));
-    else setBusinessQueue([
-      { token: 'A-14', phone: '0300-1234567', doctor: 'Dr. Ayesha Khan', time: '10:15', status: 'Done' },
-      { token: 'A-15', phone: '0301-2345678', doctor: 'Dr. Ayesha Khan', time: '10:30', status: 'Serving' },
-      { token: 'A-16', phone: '0302-3456789', doctor: 'Dr. Rabia Hassan', time: '10:45', status: 'Waiting' },
-      { token: 'A-17', phone: '0303-4567890', doctor: 'Dr. Ayesha Khan', time: '11:00', status: 'Waiting' },
-    ]);
-    const doctors = localStorage.getItem('queueiq_doctors_Al-Shifa Clinic');
-    if (doctors) setBusinessDoctors(JSON.parse(doctors));
-    else setBusinessDoctors([{ name: 'Dr. Ayesha Khan', department: 'Cardiologist', fee: 1500, email: 'dr.ayesha@alshifa.com' }]);
   }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     localStorage.setItem('queueiq_my_bookings', JSON.stringify(myBookings));
   }, [myBookings]);
+
+  // When a staff member logs in, load the doctors/departments they manage.
+  useEffect(() => {
+    if (currentBusiness) loadBizRoster(currentBusiness);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentBusiness]);
+
+  // Live queue: refetch the selected doctor's line every 2.5s while on the panel.
+  useEffect(() => {
+    if (view !== 'business' || !currentBusiness || !bizDoctorId) return;
+    loadBizQueue(bizDoctorId);
+    const id = setInterval(() => loadBizQueue(bizDoctorId), 2500);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, currentBusiness, bizDoctorId]);
 
   useEffect(() => {
     if (!toast) return;
@@ -667,36 +677,32 @@ export default function HomePage() {
     }, 700);
   };
 
+  // Log in against the REAL backend so we get the staff role + identity and a JWT
+  // for the protected /api/business/* endpoints. No more hardcoded accounts.
   const businessLogin = async () => {
-    const account = BUSINESS_ACCOUNTS[businessEmail as keyof typeof BUSINESS_ACCOUNTS];
-    if (!account || account.password !== businessPassword) {
-      setBizError('Invalid email or password.');
-      showToast('Invalid email or password');
+    const email = businessEmail.trim();
+    if (!email || !businessPassword) {
+      setBizError('Enter email and password.');
       return;
     }
     setBizError('');
-    setCurrentBusiness({ email: businessEmail, ...account });
-    setShowContactModal(false);
-    // Best-effort: fetch a backend JWT so the protected /api/business/* endpoints
-    // can be called. The local demo login still works even if this fails.
     try {
       const res = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: businessEmail, password: businessPassword }),
+        body: JSON.stringify({ email, password: businessPassword }),
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (data?.token && typeof window !== 'undefined') {
-          localStorage.setItem('queueiq_staff_token', data.token);
-        }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.token) {
+        setBizError(data.error || 'Invalid email or password.');
+        return;
       }
+      if (typeof window !== 'undefined') localStorage.setItem('queueiq_staff_token', data.token);
+      setShowContactModal(false);
+      setCurrentBusiness(data.user); // { role, doctorId, doctorName, departmentId, orgId, ... }
     } catch (err) {
-      console.warn('Backend staff login unavailable:', err);
-    }
-    if (typeof window !== 'undefined') {
-      const seed = localStorage.getItem('queueiq_queue_SHIF');
-      if (seed) setBusinessQueue(JSON.parse(seed));
+      console.warn('Backend staff login failed:', err);
+      setBizError('Could not reach the server. Try again.');
     }
   };
 
@@ -705,42 +711,98 @@ export default function HomePage() {
     setBusinessEmail('');
     setBusinessPassword('');
     setBizError('');
+    setBizDepartments([]);
+    setBizDoctors([]);
+    setBizDeptId(null);
+    setBizDoctorId(null);
+    setBizQueue({ summary: {}, tokens: [] });
+    setBizConn(false);
     if (typeof window !== 'undefined') localStorage.removeItem('queueiq_staff_token');
   };
 
-  const saveBusinessQueue = (queue: any[]) => {
-    setBusinessQueue(queue);
-    if (typeof window !== 'undefined') localStorage.setItem('queueiq_queue_SHIF', JSON.stringify(queue));
-  };
-
-  const handleQueueAction = (action: string, token: string) => {
-    const queue = [...businessQueue];
-    const row = queue.find((item) => item.token === token);
-    if (!row) return;
-    if (action === 'call') {
-      const prevServing = queue.find((item) => item.status === 'Serving');
-      if (prevServing) prevServing.status = 'Done';
-      row.status = 'Serving';
-      showToast(`Calling ${row.token}`);
-    } else if (action === 'done') {
-      row.status = 'Done';
-      showToast(`${row.token} marked Done`);
-    } else if (action === 'skip') {
-      row.status = 'Skipped';
-      showToast(`${row.token} skipped`);
-    } else if (action === 'callagain') {
-      showToast(`WhatsApp alert sent to ${row.phone} (demo)`);
+  // Load the doctors/departments this role manages (from Supabase, like the test
+  // harness): doctor -> just self; receptionist -> their department; owner -> all.
+  const loadBizRoster = async (user: any) => {
+    setBizErr('');
+    const orgId = user?.orgId || REAL_ORG_ID;
+    if (user?.role === 'doctor') {
+      setBizDepartments([]);
+      setBizDoctors([{ id: user.doctorId, name: user.doctorName || 'My line', department_id: user.departmentId }]);
+      setBizDeptId(user.departmentId || null);
+      setBizDoctorId(user.doctorId || null);
       return;
     }
-    saveBusinessQueue(queue);
+    try {
+      const { data: depts } = await supabase.from('departments').select('id,name,icon').eq('organization_id', orgId).order('name');
+      let docQuery = supabase.from('doctors').select('id,name,department_id').eq('organization_id', orgId).order('name');
+      if (user?.role === 'receptionist' && user?.departmentId) docQuery = docQuery.eq('department_id', user.departmentId);
+      const { data: docs } = await docQuery;
+      const deptList = depts || [];
+      const docList = docs || [];
+      setBizDepartments(deptList);
+      setBizDoctors(docList);
+      const defaultDept = user?.role === 'receptionist' ? (user.departmentId || null) : (deptList[0]?.id || null);
+      setBizDeptId(defaultDept);
+      const firstDoc = docList.find((d: any) => !defaultDept || d.department_id === defaultDept) || docList[0];
+      setBizDoctorId(firstDoc ? firstDoc.id : null);
+    } catch (e) {
+      setBizErr('Could not load doctors from the catalog.');
+    }
   };
 
-  const addWalkInToken = () => {
-    const queue = [...businessQueue];
-    const token = generateToken('SHIF', false);
-    queue.unshift({ token, phone: '03XXXXXXXXX', doctor: 'Front Desk', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), status: 'Waiting' });
-    saveBusinessQueue(queue);
-    showToast(`Walk-in token ${token} added`);
+  // Fetch one doctor's live queue from the backend (auth-protected).
+  const loadBizQueue = async (doctorId: string | null) => {
+    if (!doctorId) { setBizQueue({ summary: {}, tokens: [] }); return; }
+    try {
+      const res = await fetch(`${API_URL}/api/business/tokens?doctorId=${encodeURIComponent(doctorId)}`, { headers: await getApiHeaders() });
+      if (!res.ok) { setBizConn(false); return; }
+      const d = await res.json();
+      setBizQueue({ summary: d.summary || {}, tokens: d.tokens || [] });
+      setBizConn(true);
+    } catch (e) {
+      setBizConn(false);
+    }
+  };
+
+  const bizCallNext = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/business/call-next`, {
+        method: 'POST', headers: await getApiHeaders(), body: JSON.stringify({ doctorId: bizDoctorId }),
+      });
+      const d = await res.json();
+      showToast(d.message || 'Called next');
+      loadBizQueue(bizDoctorId);
+    } catch (e) { showToast('Cannot reach backend'); }
+  };
+
+  const bizComplete = async (token: string) => {
+    try {
+      const res = await fetch(`${API_URL}/api/business/complete`, {
+        method: 'POST', headers: await getApiHeaders(), body: JSON.stringify({ token }),
+      });
+      const d = await res.json();
+      showToast(d.message || 'Completed');
+      loadBizQueue(bizDoctorId);
+    } catch (e) { showToast('Cannot reach backend'); }
+  };
+
+  const bizApproveEmergency = async (token: string, decision: 'approve' | 'reject') => {
+    try {
+      const res = await fetch(`${API_URL}/api/business/approve-emergency`, {
+        method: 'POST', headers: await getApiHeaders(), body: JSON.stringify({ token, decision }),
+      });
+      const d = await res.json();
+      if (!res.ok) { showToast('Error: ' + (d.error || res.status)); return; }
+      showToast(d.message || decision);
+      if (d.note) setTimeout(() => showToast(d.note), 950);
+      loadBizQueue(bizDoctorId);
+    } catch (e) { showToast('Cannot reach backend'); }
+  };
+
+  const pickBizDept = (deptId: string) => {
+    setBizDeptId(deptId);
+    const firstDoc = bizDoctors.find((d: any) => d.department_id === deptId);
+    setBizDoctorId(firstDoc ? firstDoc.id : null);
   };
 
   const renderClinicDetail = () => {
@@ -1625,9 +1687,9 @@ export default function HomePage() {
               <button type="button" onClick={businessLogin} className="w-full rounded-lg bg-[#10B981] py-2.5 text-sm font-semibold text-[#111827] transition hover:bg-[#10B981]/90">Log In</button>
               <div className="rounded-lg border border-[#374151] bg-[#111827] p-3 text-[11px] text-[#9CA3AF]">
                 <p className="mb-1.5 font-medium text-white">Demo accounts (password: <span className="font-mono text-white">123456</span>)</p>
-                <p className="font-mono">admin@alshifa.com <span className="text-[#9CA3AF]">— owner</span></p>
-                <p className="font-mono">reception@alshifa.com <span className="text-[#9CA3AF]">— receptionist</span></p>
+                <p className="font-mono">reception.cardio@alshifa.com <span className="text-[#9CA3AF]">— receptionist</span></p>
                 <p className="font-mono">dr.ayesha@alshifa.com <span className="text-[#9CA3AF]">— doctor</span></p>
+                <p className="mt-1 text-[10px] text-[#6B7280]">Owner accounts see every department.</p>
               </div>
             </div>
           </div>
@@ -1635,51 +1697,135 @@ export default function HomePage() {
       );
     }
 
+    const role = currentBusiness.role;
+    const isDoctor = role === 'doctor';
+    const isOwner = role === 'owner';
+    const canManage = !isDoctor; // receptionist + owner may act on the queue
+    const roleLabel = isDoctor ? 'Doctor' : isOwner ? 'Owner' : 'Reception';
+    const who = currentBusiness.displayName || currentBusiness.doctorName || currentBusiness.email || 'there';
+
+    const s = bizQueue.summary || {};
+    const allTokens = bizQueue.tokens || [];
+    const lineTokens = allTokens.filter((t: any) => t.status !== 'PendingApproval');
+    const pending = allTokens.filter((t: any) => t.status === 'PendingApproval');
+    const deptDoctors = isOwner ? bizDoctors.filter((d: any) => !bizDeptId || d.department_id === bizDeptId) : bizDoctors;
+    const selectedDoctor = bizDoctors.find((d: any) => d.id === bizDoctorId);
+
     return (
       <div className="mx-auto max-w-6xl px-6 py-10 lg:px-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-white">Welcome back, {currentBusiness.orgName} 👋</h1>
-            <p className="mt-1 flex items-center gap-2 text-sm text-[#9CA3AF]"><span className="pulse-dot h-1.5 w-1.5 rounded-full bg-[#10B981]" />Here's what's happening with your queues today.</p>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold text-white">Welcome back, {who} 👋</h1>
+              <span className="rounded-full border border-[#10B981]/30 bg-[#10B981]/10 px-2.5 py-0.5 text-[11px] font-semibold text-[#10B981]">{roleLabel}</span>
+            </div>
+            <p className="mt-1 flex items-center gap-2 text-sm text-[#9CA3AF]">
+              <span className={`h-1.5 w-1.5 rounded-full ${bizConn ? 'bg-[#10B981] pulse-dot' : 'bg-[#EF4444]'}`} />
+              {bizConn ? 'Live · connected to backend' : 'Connecting to backend…'}
+            </p>
           </div>
           <button type="button" onClick={bizLogout} className="rounded-lg border border-[#374151] px-4 py-2 text-sm font-medium text-white transition hover:border-[#EF4444]/50 hover:text-[#EF4444]">Log Out</button>
         </div>
-        <div className="mt-6 flex flex-wrap gap-2">
-          <button type="button" onClick={() => showToast('Queue paused')} className="rounded-lg border border-[#374151] px-4 py-2 text-sm font-medium text-white transition hover:border-[#10B981]/50">Pause Queue</button>
-          <button type="button" onClick={() => showToast('Queue resumed')} className="rounded-lg border border-[#374151] px-4 py-2 text-sm font-medium text-white transition hover:border-[#10B981]/50">Resume Queue</button>
-          <button type="button" onClick={addWalkInToken} className="rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/10 px-4 py-2 text-sm font-medium text-[#EF4444] transition hover:border-[#EF4444]/60">+ Add Walk-in Token</button>
+
+        {bizErr ? <p className="mt-4 rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/10 px-3 py-2 text-xs text-[#EF4444]">{bizErr}</p> : null}
+
+        {/* Owner: choose a department. Doctor: no picker (own line only). */}
+        {isOwner && bizDepartments.length > 0 ? (
+          <div className="mt-6">
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-[#9CA3AF]">Department</p>
+            <div className="flex flex-wrap gap-2">
+              {bizDepartments.map((d: any) => (
+                <button key={d.id} type="button" onClick={() => pickBizDept(d.id)} className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition ${bizDeptId === d.id ? 'border-[#10B981] bg-[#10B981]/10 text-[#10B981]' : 'border-[#374151] text-[#9CA3AF] hover:text-white'}`}>{d.icon ? `${d.icon} ` : ''}{d.name}</button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {/* Reception + Owner: pick which doctor's line to manage. */}
+        {canManage ? (
+          <div className="mt-5">
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-[#9CA3AF]">Doctor's line</p>
+            {deptDoctors.length ? (
+              <div className="flex flex-wrap gap-2">
+                {deptDoctors.map((d: any) => (
+                  <button key={d.id} type="button" onClick={() => setBizDoctorId(d.id)} className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition ${bizDoctorId === d.id ? 'border-[#10B981] bg-[#10B981]/10 text-[#10B981]' : 'border-[#374151] text-[#9CA3AF] hover:text-white'}`}>{d.name}</button>
+                ))}
+              </div>
+            ) : <p className="text-sm text-[#6B7280]">No doctors found for this department.</p>}
+          </div>
+        ) : null}
+
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm font-semibold text-white">{selectedDoctor ? `${selectedDoctor.name}'s line` : 'Live queue'}</p>
+          <div className="flex gap-2">
+            {canManage ? <button type="button" onClick={bizCallNext} disabled={!bizDoctorId} className="rounded-lg bg-[#10B981] px-4 py-2 text-sm font-semibold text-[#111827] transition hover:bg-[#10B981]/90 disabled:cursor-not-allowed disabled:opacity-50">📢 Call Next</button> : null}
+            <button type="button" onClick={() => loadBizQueue(bizDoctorId)} className="rounded-lg border border-[#374151] px-3 py-2 text-sm font-medium text-white transition hover:border-[#10B981]/50">↻ Refresh</button>
+          </div>
         </div>
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="rounded-xl border border-[#374151] bg-[#112240] p-5"><p className="text-xs text-[#9CA3AF]">Tokens Today</p><p className="mt-1 text-2xl font-bold text-white">{businessQueue.length}</p></div>
-          <div className="rounded-xl border border-[#374151] bg-[#112240] p-5"><p className="text-xs text-[#9CA3AF]">Now Serving</p><p className="mt-1 text-2xl font-bold text-[#10B981]">{businessQueue.find((row) => row.status === 'Serving')?.token || '--'}</p></div>
-          <div className="rounded-xl border border-[#374151] bg-[#112240] p-5"><p className="text-xs text-[#9CA3AF]">Waiting</p><p className="mt-1 text-2xl font-bold text-white">{businessQueue.filter((row) => row.status === 'Waiting').length}</p></div>
+
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-xl border border-[#374151] bg-[#112240] p-5"><p className="text-xs text-[#9CA3AF]">Now Serving</p><p className="mt-1 text-2xl font-bold text-[#10B981]">{s.nowServing || '--'}</p></div>
+          <div className="rounded-xl border border-[#374151] bg-[#112240] p-5"><p className="text-xs text-[#9CA3AF]">Waiting</p><p className="mt-1 text-2xl font-bold text-white">{s.waiting ?? 0}</p></div>
+          <div className="rounded-xl border border-[#374151] bg-[#112240] p-5"><p className="text-xs text-[#9CA3AF]">Done</p><p className="mt-1 text-2xl font-bold text-white">{s.done ?? 0}</p></div>
+          <div className="rounded-xl border border-[#374151] bg-[#112240] p-5"><p className="text-xs text-[#9CA3AF]">Total</p><p className="mt-1 text-2xl font-bold text-white">{s.total ?? 0}</p></div>
         </div>
+
+        {/* Emergency approvals — reception + owner only. */}
+        {canManage && pending.length > 0 ? (
+          <div className="mt-8">
+            <p className="mb-3 text-sm font-semibold text-[#F59E0B]">Emergencies awaiting approval ({pending.length})</p>
+            <div className="space-y-3">
+              {pending.map((r: any) => {
+                const t = r.triage || {};
+                return (
+                  <div key={r.token} className="rounded-xl border border-[#F59E0B]/30 bg-[#F59E0B]/5 p-4">
+                    <div className="flex flex-wrap items-center gap-2 text-sm text-white">
+                      <span className="font-mono font-bold">{r.token}</span>
+                      <span className="text-[#9CA3AF]">· {r.emergencyType || '—'}</span>
+                      <span className="text-[#9CA3AF]">· urgency <b className="text-white">{t.urgencyScore != null ? Math.round(t.urgencyScore * 100) + '%' : '—'}</b></span>
+                      {t.recommendation ? <span className="rounded-full border border-[#374151] px-2 py-0.5 text-[10px] text-[#9CA3AF]">{t.recommendation}</span> : null}
+                    </div>
+                    {(r.description || r.phone) ? <p className="mt-1 text-xs text-[#9CA3AF]">&quot;{r.description || ''}&quot; {r.phone ? `· ${r.phone}` : ''}</p> : null}
+                    <div className="mt-3 flex gap-2">
+                      <button type="button" onClick={() => bizApproveEmergency(r.token, 'approve')} className="rounded-lg bg-[#10B981] px-3 py-1.5 text-xs font-semibold text-[#111827] transition hover:bg-[#10B981]/90">✓ Approve</button>
+                      <button type="button" onClick={() => bizApproveEmergency(r.token, 'reject')} className="rounded-lg border border-[#EF4444] px-3 py-1.5 text-xs font-semibold text-[#EF4444] transition hover:bg-[#EF4444] hover:text-white">✕ Reject</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+
         <div className="mt-8">
-          <p className="mb-3 text-sm font-semibold text-white">Live Queue</p>
+          <p className="mb-3 text-sm font-semibold text-white">Queue</p>
           <div className="overflow-x-auto rounded-xl border border-[#374151]">
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-[#374151] bg-[#111827] text-[11px] uppercase tracking-wide text-[#9CA3AF]">
-                  <th className="px-4 py-3">Token</th><th className="px-4 py-3">Phone</th><th className="px-4 py-3">Doctor</th><th className="px-4 py-3">Time</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Actions</th>
+                  <th className="px-4 py-3">Pos</th><th className="px-4 py-3">Token</th><th className="px-4 py-3">Type</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Phone</th>{canManage ? <th className="px-4 py-3 text-right">Action</th> : null}
                 </tr>
               </thead>
               <tbody>
-                {businessQueue.map((row) => (
-                  <tr key={row.token} className="border-b border-[#374151] last:border-0">
-                    <td className="px-4 py-3 font-mono font-bold text-white">{row.token}</td>
-                    <td className="px-4 py-3 text-[#9CA3AF]">{row.phone}</td>
-                    <td className="px-4 py-3 text-[#9CA3AF]">{row.doctor}</td>
-                    <td className="px-4 py-3 text-[#9CA3AF]">{row.time}</td>
-                    <td className="px-4 py-3"><span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-medium ${row.status === 'Serving' ? 'border-[#10B981]/30 bg-[#10B981]/10 text-[#10B981]' : row.status === 'Done' ? 'border-[#374151] bg-[#1F2937] text-[#9CA3AF]' : row.status === 'Skipped' ? 'border-[#EF4444]/30 bg-[#EF4444]/10 text-[#EF4444]' : 'border-[#F59E0B]/30 bg-[#F59E0B]/10 text-[#F59E0B]'}`}>{row.status}</span></td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex justify-end gap-1.5">
-                        {row.status === 'Waiting' ? <button type="button" onClick={() => handleQueueAction('call', row.token)} className="rounded-lg border border-[#374151] px-2 py-1 text-[11px] font-medium text-white transition hover:border-[#10B981]/50">Call Next</button> : null}
-                        {row.status !== 'Done' ? <button type="button" onClick={() => handleQueueAction('done', row.token)} className="rounded-lg border border-[#374151] px-2 py-1 text-[11px] font-medium text-white transition hover:border-[#10B981]/50">Done</button> : null}
-                        {row.status === 'Waiting' ? <button type="button" onClick={() => handleQueueAction('skip', row.token)} className="rounded-lg border border-[#374151] px-2 py-1 text-[11px] font-medium text-[#EF4444] transition hover:border-[#EF4444]/50">Skip</button> : null}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {lineTokens.length ? lineTokens.map((row: any) => {
+                  const canComplete = row.status === 'Waiting' || row.status === 'Serving';
+                  return (
+                    <tr key={row.token} className="border-b border-[#374151] last:border-0">
+                      <td className="px-4 py-3 text-[#9CA3AF]">{row.position ?? '—'}</td>
+                      <td className="px-4 py-3 font-mono font-bold text-white">{row.token}</td>
+                      <td className="px-4 py-3"><span className="rounded-full border border-[#374151] px-2 py-0.5 text-[10px] text-[#9CA3AF]">{row.tokenType || 'normal'}</span></td>
+                      <td className="px-4 py-3"><span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-medium ${row.status === 'Serving' ? 'border-[#10B981]/30 bg-[#10B981]/10 text-[#10B981]' : row.status === 'Done' ? 'border-[#374151] bg-[#1F2937] text-[#9CA3AF]' : row.status === 'Rejected' || row.status === 'Cancelled' ? 'border-[#EF4444]/30 bg-[#EF4444]/10 text-[#EF4444]' : 'border-[#F59E0B]/30 bg-[#F59E0B]/10 text-[#F59E0B]'}`}>{row.status}</span></td>
+                      <td className="px-4 py-3 text-[#9CA3AF]">{row.phone || ''}</td>
+                      {canManage ? (
+                        <td className="px-4 py-3 text-right">
+                          {canComplete ? <button type="button" onClick={() => bizComplete(row.token)} className="rounded-lg border border-[#374151] px-2 py-1 text-[11px] font-medium text-white transition hover:border-[#10B981]/50">Complete</button> : null}
+                        </td>
+                      ) : null}
+                    </tr>
+                  );
+                }) : (
+                  <tr><td colSpan={canManage ? 6 : 5} className="px-4 py-8 text-center text-[#6B7280]">This line is empty.</td></tr>
+                )}
               </tbody>
             </table>
           </div>
