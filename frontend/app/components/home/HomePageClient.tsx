@@ -33,6 +33,7 @@ import { SALONS_DATA } from '@/app/data/salons';
 import { categories } from '@/app/data/categories';
 import UniversalCard from '@/app/components/common/UniversalCard';
 import SearchAndFilter from '@/app/components/common/SearchAndFilter';
+import ChatBotModal from '@/components/ChatBotModal';
 import { CATEGORY_MAP, CLINICS, DOCTORS_BY_DEPT } from '../../../lib/data';
 import { supabase } from '../../../lib/supabase';
 import { CalendarActions } from '../../../lib/calendar-actions';
@@ -227,6 +228,7 @@ export default function HomePage() {
   const [reservationInterval, setReservationInterval] = useState<ReturnType<typeof setInterval> | null>(null);
   const [contactForm, setContactForm] = useState({ name: '', phone: '', issue: '', message: '' });
   const [businessContactForm, setBusinessContactForm] = useState({ name: '', businessName: '', businessType: '', phone: '', email: '', city: '', volume: '', message: '' });
+  const [isChatBotOpen, setIsChatBotOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('JazzCash');
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [txnId, setTxnId] = useState('');
@@ -2095,7 +2097,9 @@ export default function HomePage() {
       {renderContactModal()}
       {renderMyBookingsModal()}
       {/* TODO: Add business WhatsApp number via NEXT_PUBLIC_WHATSAPP_NUMBER */}
-      <a href={process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ? `https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER}` : "https://wa.me/"} target="_blank" rel="noreferrer" style={{ bottom: '20px', right: '20px' }} className="fixed bottom-6 right-6 z-[9999] flex h-14 w-14 items-center justify-center rounded-full bg-[#25D366] text-white shadow-[0_4px_20px_rgba(37,211,102,0.4)] transition-all duration-300 ease-in-out hover:scale-110 hover:bg-[#128C7E] hover:shadow-[0_6px_25px_rgba(18,140,126,0.5)]"><MessageCircle className="h-7 w-7" /></a>
+      <button onClick={() => setIsChatBotOpen(true)} style={{ bottom: '20px', right: '20px' }} className="fixed bottom-6 right-6 z-[9999] flex h-14 w-14 items-center justify-center rounded-full bg-[#25D366] text-white shadow-[0_4px_20px_rgba(37,211,102,0.4)] transition-all duration-300 ease-in-out hover:scale-110 hover:bg-[#128C7E] hover:shadow-[0_6px_25px_rgba(18,140,126,0.5)]" aria-label="Open chat"><MessageCircle className="h-7 w-7" /></button>
+
+      <ChatBotModal isOpen={isChatBotOpen} onClose={() => setIsChatBotOpen(false)} />
     </div>
   );
 }

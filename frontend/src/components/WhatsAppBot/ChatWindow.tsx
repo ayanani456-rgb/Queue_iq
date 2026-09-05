@@ -83,7 +83,11 @@ export default function ChatWindow({
             >
               <p className="break-words whitespace-pre-wrap">{item.text}</p>
               <p className="mt-1 flex items-center justify-end gap-1 text-[10px] text-[#667781]">
-                12:14 PM
+                {typeof item.time === "string" 
+                  ? new Date(item.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                  : item.time instanceof Date 
+                  ? item.time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                  : "12:14 PM"}
                 {item.sender === "bot" ? <CheckCheck size={14} className="text-[#53BDEB]" aria-label="Read" /> : null}
               </p>
               {item.showPaymentButton ? (

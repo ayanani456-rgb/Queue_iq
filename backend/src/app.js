@@ -13,15 +13,15 @@ const app = express();
 // package instead of hand-written headers. Allowing the `Authorization` header
 // lets the frontend send a login token later — note CORS only permits the header
 // through the door; it does NOT authenticate anyone (that's a separate concern).
-// TODO (before production): '*' lets ANY website read our responses in a browser.
-// Fine for local dev, but replace it with our real frontend origin
-// (e.g. 'https://queueiq.com'). '*' also cannot be combined with logged-in cookies.
+const ALLOWED_ORIGINS = [
+  'https://queueiq-frontend.vercel.app',
+  'http://localhost:3000',
+  process.env.FRONTEND_URL, // Allow custom frontend URL if set
+].filter(Boolean);
+
 app.use(cors({
   origin(origin, callback) {
-    const allowed = !origin
-      || origin === 'https://queueiq-frontend.vercel.app'
-      || origin === 'http://localhost:3000'
-      || /^https:\/\/[^/]+\.vercel\.app$/.test(origin);
+    const allowed = !origin || ALLOWED_ORIGINS.includes(origin);
     callback(null, allowed);
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -59,9 +59,19 @@ app.get('/test', (req, res) => res.sendFile(path.join(__dirname, 'public', 'test
 const { startAi } = require('./startAi');
 const { connectRedis } = require('./config/redis');
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+
+const server = app.listen(PORT, () => {
   console.log(`QueueIQ backend listening on http://localhost:${PORT}`);
-  connectRedis().catch((error) => console.error('Redis connection failed', error));
+  
+  // Try to connect to Redis if configured, but don't block startup on failure
+  if (process.env.REDIS_URL) {
+    connectRedis().catch((error) => {
+      console.warn('[redis] Connection failed, cache features will be unavailable:', error.message);
+    });
+  } else {
+    console.log('[redis] REDIS_URL not configured, cache features disabled');
+  }
+  
   startAi();   // bring the AI microservice up alongside the server
 });
 
