@@ -49,6 +49,29 @@ export const DOCTORS_BY_DEPT: any = {
   ],
 };
 
+export const CITY_DOCTORS_BY_DEPT: any = {
+  gp: [
+    { id: 'city_d1', name: 'Dr. Tariq Mahmood', specialty: 'General Physician', experience: 14, rating: 4.8, reviews: 310, fee: 1000, bio: 'General diagnosis, family medicine, hypertension & fever care.', schedule: [{ days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'], start: '09:00', end: '14:00' }] },
+    { id: 'city_d2', name: 'Dr. Nadia Khan', specialty: 'General Physician', experience: 8, rating: 4.6, reviews: 145, fee: 1000, bio: 'Primary healthcare, women routine checkups and preventive health.', schedule: [{ days: ['Mon', 'Wed', 'Sat'], start: '16:00', end: '20:00' }] },
+  ],
+  cardio: [
+    { id: 'city_d3', name: 'Dr. Kamran Ali', specialty: 'Cardiologist', experience: 11, rating: 4.7, reviews: 180, fee: 1800, bio: 'Clinical cardiology, ECG, echocardiography and heart wellness.', schedule: [{ days: ['Tue', 'Thu', 'Sat'], start: '11:00', end: '15:00' }] },
+    { id: 'city_d4', name: 'Dr. Faisal Rauf', specialty: 'Cardiologist', experience: 9, rating: 4.5, reviews: 112, fee: 1600, bio: 'Cardiac diagnostics, chest pain and BP management.', schedule: [{ days: ['Mon', 'Wed', 'Fri'], start: '10:00', end: '13:00' }] },
+  ],
+  derma: [
+    { id: 'city_d5', name: 'Dr. Sadaf Naz', specialty: 'Dermatologist', experience: 7, rating: 4.7, reviews: 154, fee: 1200, bio: 'Cosmetic dermatology, allergies, acne and skin care.', schedule: [{ days: ['Mon', 'Thu'], start: '14:00', end: '18:00' }] },
+  ],
+  dentist: [
+    { id: 'city_d6', name: 'Dr. Bilal Saeed', specialty: 'Dentist', experience: 10, rating: 4.8, reviews: 220, fee: 1000, bio: 'Dentistry, root canal, scaling and extraction.', schedule: [{ days: ['Tue', 'Fri'], start: '10:00', end: '14:00' }] },
+  ],
+  neuro: [
+    { id: 'city_d7', name: 'Dr. Waqas Ahmed', specialty: 'Neurologist', experience: 12, rating: 4.9, reviews: 195, fee: 2000, bio: 'Neurology, headaches, stroke recovery and nerve care.', schedule: [{ days: ['Mon', 'Wed'], start: '11:00', end: '14:00' }] },
+  ],
+  ortho: [
+    { id: 'city_d8', name: 'Dr. Asad Ullah', specialty: 'Orthopedic', experience: 15, rating: 4.8, reviews: 240, fee: 1800, bio: 'Orthopedic surgery, fractures, spine and joint pain.', schedule: [{ days: ['Tue', 'Thu', 'Sat'], start: '15:00', end: '19:00' }] },
+  ],
+};
+
 // Helper to merge real Supabase doctors into mock structure
 export function mergeRealDoctors(realDoctors: any[]) {
   if (!realDoctors || realDoctors.length === 0) return DOCTORS_BY_DEPT

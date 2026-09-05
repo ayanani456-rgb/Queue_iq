@@ -34,7 +34,7 @@ import { categories } from '@/app/data/categories';
 import UniversalCard from '@/app/components/common/UniversalCard';
 import SearchAndFilter from '@/app/components/common/SearchAndFilter';
 import ChatBotModal from '@/components/ChatBotModal';
-import { CATEGORY_MAP, CLINICS, DOCTORS_BY_DEPT } from '../../../lib/data';
+import { CATEGORY_MAP, CLINICS, DOCTORS_BY_DEPT, CITY_DOCTORS_BY_DEPT } from '../../../lib/data';
 import { supabase } from '../../../lib/supabase';
 import { CalendarActions } from '../../../lib/calendar-actions';
 
@@ -430,7 +430,7 @@ export default function HomePage() {
     }, 1500);
   };
 
-  const handleGenericBookSuccess = (paymentType: 'online' | 'reception', customTxnId?: string) => {
+  const handleGenericBookSuccess = async (paymentType: 'online' | 'reception', customTxnId?: string) => {
     const org = bookingState?.org || {};
     const token = generateGenericToken(org.type, org.status === 'closed', org.name);
     const randomNum = Math.floor(100 + Math.random() * 900);
@@ -438,6 +438,34 @@ export default function HomePage() {
     const dateStr = formatDateLabel(bookingState?.date || new Date());
     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const phoneStr = bookingState?.phone || (bookingPhone ? `${bookingPhoneCode} ${bookingPhone}` : '');
+    const usedTxnId = customTxnId || (paymentType === 'online' ? (txnId || `TXN-${Math.floor(100000 + Math.random() * 900000)}`) : null);
+
+    console.log("handleGenericBookSuccess invoked:", { paymentType, org, token, phoneStr, method: paymentMethod });
+
+    if (paymentType === 'online') {
+      try {
+        const res = await fetch('/api/payments/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            organization_id: org.id || org.clinicId || 'org-1',
+            organization_type: org.type || 'service',
+            amount: org.price ?? 1500,
+            token: token,
+            phone: phoneStr,
+            method: paymentMethod || 'JazzCash'
+          })
+        });
+        const data = await res.json().catch(() => ({}));
+        console.log("Payment create API response:", data);
+        showToast(`Payment initiated! Token ${token}`);
+      } catch (err) {
+        console.error("Payment API call error:", err);
+        showToast(`Token ${token} booked successfully!`);
+      }
+    } else {
+      showToast(`Token ${token} booked! Pay at counter / reception`);
+    }
 
     const record = {
       id: Date.now(),
@@ -458,7 +486,7 @@ export default function HomePage() {
       payment: paymentType,
       payment_status: paymentType === 'online' ? 'paid' : 'pending',
       paymentStatus: paymentType === 'online' ? 'Paid' : 'Pending',
-      txnId: customTxnId || (paymentType === 'online' ? (txnId || '110') : null),
+      txnId: usedTxnId,
       method: paymentType === 'online' ? (paymentMethod || 'Online') : 'Reception',
       date: dateStr,
       time: timeStr,
@@ -467,7 +495,6 @@ export default function HomePage() {
 
     setMyBookings((prev) => [...prev, record]);
     setBookingState((prev: any) => ({ ...prev, genericRecord: record, step: 'g-confirm' }));
-    showToast(`Token generated: ${token}`);
 
     if (typeof window !== 'undefined') {
       try {
@@ -506,17 +533,21 @@ export default function HomePage() {
 
   const [realDoctorsByDept, setRealDoctorsByDept] = useState<any>(DOCTORS_BY_DEPT)
 
-  const getDoctorsForDept = (deptId: string | undefined) => {
+  const getDoctorsForDept = (deptId: string | undefined, clinicId?: string) => {
+    const targetClinic = (clinicId || bookingState?.clinicId || bookingState?.org?.clinicId || bookingState?.org?.name || '').toString().toLowerCase();
+    const isCity = targetClinic === 'citymedical' || targetClinic.includes('city medical');
+    const source = isCity ? CITY_DOCTORS_BY_DEPT : realDoctorsByDept;
+
     if (deptId === 'all') {
       const seen = new Set<string>();
-      return Object.values(realDoctorsByDept).flat().filter((doctor: any) => {
+      return Object.values(source).flat().filter((doctor: any) => {
         const key = doctor.name || doctor.id;
         if (seen.has(key)) return false;
         seen.add(key);
         return true;
       });
     }
-    return realDoctorsByDept[deptId as keyof typeof DOCTORS_BY_DEPT] || [];
+    return source[deptId as keyof typeof DOCTORS_BY_DEPT] || [];
   };
 
   useEffect(() => {
@@ -1522,7 +1553,7 @@ export default function HomePage() {
               <label className="block text-sm font-medium text-white">Transaction ID</label>
               <input value={txnId} onChange={(e) => setTxnId(e.target.value)} placeholder="Enter Transaction ID / TID (e.g. 110)" className="mt-1.5 w-full rounded-lg border border-[#374151] bg-[#111827] px-3 py-2.5 text-sm text-white placeholder-[#9CA3AF] focus:border-[#10B981] focus:outline-none" />
             </div>
-            <button type="button" disabled={txnId.trim().length < 2} onClick={() => handleGenericBookSuccess('online', txnId.trim())} className="mt-4 w-full rounded-lg bg-[#10B981] py-2.5 text-sm font-semibold text-[#111827] transition hover:bg-[#10B981]/90 disabled:cursor-not-allowed disabled:bg-[#374151] disabled:text-[#9CA3AF]">Verify & Get Token</button>
+            <button type="button" onClick={() => handleGenericBookSuccess('online', txnId.trim() || '110')} className="mt-4 w-full rounded-lg bg-[#10B981] py-2.5 text-sm font-semibold text-[#111827] transition hover:bg-[#10B981]/90">Verify & Get Token</button>
           </div>
         );
       case 'g-confirm': {
