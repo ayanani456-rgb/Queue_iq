@@ -27,8 +27,25 @@ if (useSupabase) {
 const DEMO_STAFF = {
   'admin@alshifa.com': { password: '123456', role: 'owner' },
   'reception@alshifa.com': { password: '123456', role: 'receptionist' },
-  'dr.ayesha@alshifa.com': { password: '123456', role: 'doctor', doctorId: 'd1' },
+  'dr.ayesha@alshifa.com': { password: '123456', role: 'doctor', doctorId: 'd1', doctorName: 'Dr. Ayesha Khan' },
 };
+
+// Map a raw account row (from the login() rpc) to the identity the dashboard needs.
+// The role-based business dashboard reads role / doctorId / departmentId / orgId.
+function mapAccount(account, fallbackEmail) {
+  return {
+    email: account.email || fallbackEmail,
+    role: account.role || account.type || 'staff',
+    doctorId: account.doctor_id || account.doctorId || null,
+    doctorName: account.doctor_name || account.doctorName || null,
+    departmentId: account.department_id || account.departmentId || null,
+    departmentName: account.department_name || account.departmentName || null,
+    orgId: account.organization_id || account.org_id || account.orgId || null,
+    orgSlug: account.org_slug || account.orgSlug || null,
+    displayName: account.display_name || account.displayName || null,
+    accountId: account.account_id || account.id || null,
+  };
+}
 
 // Return a normalized user object if the credentials are valid, else null.
 async function verifyCredentials(email, password) {
@@ -39,17 +56,12 @@ async function verifyCredentials(email, password) {
     if (error) throw error;
     const account = Array.isArray(data) ? data[0] : data;
     if (!account) return null;
-    return {
-      email: account.email || email,
-      role: account.role || account.type || 'staff',
-      doctorId: account.doctor_id || account.doctorId || null,
-      orgId: account.organization_id || account.org_id || null,
-    };
+    return mapAccount(account, email);
   }
 
   const demo = DEMO_STAFF[email];
   if (!demo || demo.password !== password) return null;
-  return { email, role: demo.role, doctorId: demo.doctorId || null, orgId: null };
+  return mapAccount({ ...demo, email }, email);
 }
 
 // POST /api/auth/login
